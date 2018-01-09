@@ -1,16 +1,17 @@
 {
     "name": "grasmash/artifice",
-    "description": "",
+    "description": "Generate an deployment-ready artifact for a Drupal application.",
     "type": "composer-plugin",
     "require": {
-        "composer-plugin-api": "^1.1"
+        "composer-plugin-api": "^1.0.0"
     },
     "require-dev": {
-        "composer/composer": "^1.1"
+        "composer/composer": "^1.0.0"
     },
     "autoload": {
         "psr-4": {
-            "Grasmash\\Artifice\\": "src/"
+            "Grasmash\\Artifice\\": "src",
+            "Grasmash\\Artifice\\Composer\\": "src/Composer"
         }
     },
     "extra": {

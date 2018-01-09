@@ -1,28 +1,18 @@
 <?php
 
-namespace Grasmash\Arifice\Composer;
+namespace Grasmash\Artifice\Composer;
 
 use Composer\Composer;
-use Composer\EventDispatcher\EventSubscriberInterface;
-use Composer\Installer\PackageEvents;
 use Composer\IO\IOInterface;
 use Composer\Plugin\Capable;
 use Composer\Plugin\PluginInterface;
+use Composer\Util\ProcessExecutor;
 
-class Plugin implements PluginInterface, Capable, EventSubscriberInterface
+class Plugin implements PluginInterface, Capable
 {
   protected $composer;
   protected $io;
 
-  /**
-   * Returns an array of event names this subscriber wants to listen to.
-   */
-  public static function getSubscribedEvents() {
-    return array(
-      PackageEvents::POST_PACKAGE_INSTALL => "hi",
-      PackageEvents::POST_PACKAGE_UPDATE => "hi",
-    );
-  }
 
   public function activate(Composer $composer, IOInterface $io)
   {
@@ -35,9 +25,5 @@ class Plugin implements PluginInterface, Capable, EventSubscriberInterface
     return array(
       'Composer\Plugin\Capability\CommandProvider' => 'Grasmash\Artifice\Composer\CommandProvider',
     );
-  }
-
-  public function hi() {
-    $this->io->output->writeln('HI');
   }
 }
