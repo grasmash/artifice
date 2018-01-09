@@ -1,0 +1,19 @@
+{
+    "name": "grasmash/artifice",
+    "description": "",
+    "type": "composer-plugin",
+    "require": {
+        "composer-plugin-api": "^1.1"
+    },
+    "require-dev": {
+        "composer/composer": "^1.1"
+    },
+    "autoload": {
+        "psr-4": {
+            "Grasmash\\Artifice\\": "src/"
+        }
+    },
+    "extra": {
+        "class": "Grasmash\\Artifice\\Composer\\Plugin"
+    }
+}
