@@ -46,6 +46,7 @@ $ composer test
 ### Auto-fix code style
 
 ```
+$ cd /path/to/artifice
 $ composer cbf
 ```
 

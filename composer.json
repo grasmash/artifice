@@ -3,7 +3,8 @@
     "description": "Generate an deployment-ready artifact for a Drupal application.",
     "type": "composer-plugin",
     "require": {
-        "composer-plugin-api": "^1.0.0"
+        "composer-plugin-api": "^1.0.0",
+        "webmozart/path-util": "^2.3"
     },
     "require-dev": {
         "composer/composer": "^1.0.0",
@@ -14,6 +15,11 @@
         "psr-4": {
             "Grasmash\\Artifice\\": "src",
             "Grasmash\\Artifice\\Composer\\": "src/Composer"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Grasmash\\Artifice\\Tests\\": "tests/phpunit/src"
         }
     },
     "extra": {

@@ -4,7 +4,6 @@ namespace Grasmash\Artifice\Composer;
 
 use Composer\Util\Filesystem;
 use Composer\Util\ProcessExecutor;
-use function explode;
 use RuntimeException;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;

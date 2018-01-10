@@ -1,0 +1,17 @@
+{
+  "name": "grasmash/artifice-sut",
+  "description": "An test project that relies on artifice.",
+  "type": "project",
+  "repositories": {
+    "artifice": {
+      "type": "path",
+      "url": "[replace-me]",
+      "options": {
+        "symlink": true
+      }
+    }
+  },
+  "require": {
+    "grasmash/artifice": "*@dev"
+  }
+}
