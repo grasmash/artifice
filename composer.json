@@ -6,7 +6,9 @@
         "composer-plugin-api": "^1.0.0"
     },
     "require-dev": {
-        "composer/composer": "^1.0.0"
+        "composer/composer": "^1.0.0",
+        "phpunit/phpunit": "^5.7",
+        "squizlabs/php_codesniffer": "^3.2"
     },
     "autoload": {
         "psr-4": {
@@ -15,6 +17,31 @@
         }
     },
     "extra": {
-        "class": "Grasmash\\Artifice\\Composer\\Plugin"
+        "class": "Grasmash\\Artifice\\Composer\\Plugin",
+        "branch-alias": {
+            "dev-master": "1.x-dev"
+        }
+    },
+    "minimum-stability": "stable",
+    "scripts": {
+        "cs": "phpcs -n --standard=PSR2 src tests --exclude=Generic.Files.LineLength",
+        "cbf": "phpcbf -n --standard=PSR2 src tests --exclude=Generic.Files.LineLength",
+        "unit": "phpunit",
+        "lint": [
+            "find src -name '*.php' -print0 | xargs -0 -n1 php -l",
+            "find tests -name '*.php' -print0 | xargs -0 -n1 php -l"
+        ],
+        "test": [
+            "@lint",
+            "@unit",
+            "@cs"
+        ]
+    },
+    "config": {
+        "optimize-autoloader": true,
+        "sort-packages": true,
+        "platform": {
+            "php": "5.6"
+        }
     }
 }
