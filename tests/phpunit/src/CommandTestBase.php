@@ -53,7 +53,7 @@ abstract class CommandTestBase extends \PHPUnit_Framework_TestCase
    *
    * @return bool|string
    */
-   protected function makeSandbox()
+    protected function makeSandbox()
     {
         $tmp = getenv('ARTIFICE_TMP') ?: sys_get_temp_dir();
         $sandbox = Path::canonicalize($tmp . "/artifice-sandbox");
