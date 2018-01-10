@@ -1,7 +1,15 @@
+## Install
+
+`$ composer require grasmash/artifice`
+
 ## Contributing
 
+Clone repo:
+```
+$ git clone git@github.com:grasmash/artifice.git /path/to/artifice
+```
 
-Add to `~/.composer/composer.json`
+Edit `~/.composer/composer.json`:
 ```
 {
     "repositories": {
@@ -18,7 +26,14 @@ Add to `~/.composer/composer.json`
     }
 }
 ```
+Execute:
+```
+$ composer global update
+$ composer list
+```
 
-Execute `composer global update`.
+You should now see `generate-artifact` as an available command.
 
-You should now see `generate-artifact` in `composer list` commands.
+## Debugging
+
+Composer disables xDebug by default. To force xDebug usage when debugging the `generate-arifact` command, run `COMPOSER_ALLOW_XDEBUG=1 composer generate-artifact`.
