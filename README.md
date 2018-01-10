@@ -1,3 +1,5 @@
+[![Build Status](https://travis-ci.org/grasmash/artifice.svg?branch=master)](https://travis-ci.org/grasmash/artifice)
+
 ## Install
 
 `$ composer require grasmash/artifice`
