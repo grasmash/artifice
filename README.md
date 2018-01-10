@@ -36,6 +36,23 @@ $ composer list
 
 You should now see `generate-artifact` as an available command.
 
-## Debugging
+### Testing
 
-Composer disables xDebug by default. To force xDebug usage when debugging the `generate-arifact` command, run `COMPOSER_ALLOW_XDEBUG=1 composer generate-artifact`.
+```
+$ cd /path/to/artifice
+$ composer test
+```
+
+### Auto-fix code style
+
+```
+$ composer cbf
+```
+
+### Debugging
+
+Composer disables xDebug by default. To force xDebug usage when debugging the `generate-arifact` command, run:
+
+```
+$ COMPOSER_ALLOW_XDEBUG=1 composer generate-artifact
+```
