@@ -9,7 +9,8 @@ use Symfony\Component\Console\Helper\QuestionHelper;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 
-class TestableGenerateArtifactCommand extends GenerateArtifactCommand {
+class TestableGenerateArtifactCommand extends GenerateArtifactCommand
+{
 
     /**
      * Set io on the test application.
@@ -31,5 +32,4 @@ class TestableGenerateArtifactCommand extends GenerateArtifactCommand {
         $application = $this->getApplication();
         $application->setIo(new ConsoleIO($input, $output, $helperSet));
     }
-
 }

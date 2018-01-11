@@ -39,7 +39,6 @@ class GenerateArtifactCommandTest extends CommandTestBase
         } catch (RuntimeException $e) {
             $this->assertContains("There are uncommitted changes", $e->getMessage());
         }
-
     }
 
     /**
@@ -74,7 +73,8 @@ class GenerateArtifactCommandTest extends CommandTestBase
     /**
      * Test that default git commit message is correct.
      */
-    public function testGetLastCommitMessage() {
+    public function testGetLastCommitMessage()
+    {
         $expected = $this->getDefaultCommitMessage();
         $this->application->setIo(new BufferIO());
         $actual = $this->command->getLastCommitMessage();
@@ -84,15 +84,15 @@ class GenerateArtifactCommandTest extends CommandTestBase
     /**
      * Test that user is prompted to create tag when no args are provided.
      */
-    public function testCreateTagQuestion() {
+    public function testCreateTagQuestion()
+    {
         try {
             $this->commandTester->execute([]);
-        }
-        catch (Exception $e) {
+        } catch (Exception $e) {
             // An "abort" RuntimeException will be throw by the QuestionHelper
             // when a question goes unanswered. Ignore it, we just want to
             // assert that the question was asked.
         }
-        $this->assertContains("Would you like to create a tag", $this->commandTester->getDisplay(TRUE));
+        $this->assertContains("Would you like to create a tag", $this->commandTester->getDisplay(true));
     }
 }

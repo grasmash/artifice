@@ -65,7 +65,8 @@ abstract class CommandTestBase extends \PHPUnit_Framework_TestCase
         return $sandbox;
     }
 
-    protected function getDefaultCommitMessage() {
+    protected function getDefaultCommitMessage()
+    {
         return "Initial commit.";
     }
 }
