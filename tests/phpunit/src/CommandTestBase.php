@@ -2,8 +2,6 @@
 
 namespace Grasmash\Artifice\Tests;
 
-use Composer\IO\NullIO;
-use function dirname;
 use Grasmash\Artifice\Composer\GenerateArtifactCommand;
 use Symfony\Component\Console\Tester\CommandTester;
 use Symfony\Component\Filesystem\Filesystem;
@@ -13,46 +11,42 @@ use Webmozart\PathUtil\Path;
 abstract class CommandTestBase extends \PHPUnit_Framework_TestCase
 {
 
-  /** @var Application */
+    /** @var Application */
     protected $application;
 
-  /** @var GenerateArtifactCommand $command */
+    /** @var GenerateArtifactCommand $command */
     protected $command;
 
-  /** @var CommandTester */
+    /** @var CommandTester */
     protected $commandTester;
 
-  /** @var Filesystem */
+    /** @var Filesystem */
     protected $fs;
 
-  /** @var String */
+    /** @var String */
     protected $artificePath;
 
-  /**
-   * {@inheritdoc}
-   *
-   * @see https://symfony.com/doc/current/console.html#testing-commands
-   */
+    /**
+     * {@inheritdoc}
+     *
+     * @see https://symfony.com/doc/current/console.html#testing-commands
+     */
     public function setUp()
     {
         parent::setUp();
         $this->application = new Application();
-        $this->application->add(new GenerateArtifactCommand());
-        $io = new NullIO();
-        $this->application->setIo($io);
-        $this->command = $this->application->find('generate-artifact');
-        $this->commandTester = new CommandTester($this->command);
         $this->fs = new Filesystem();
         $this->artificePath = dirname(dirname(dirname(__DIR__)));
+        $this->sandbox = $this->makeSandbox();
     }
 
-  /**
-   * Destroy and re-create sandbox directory for testing.
-   *
-   * Sandbox is a mirror of tests/fixtures/sandbox, located in a temp dir.
-   *
-   * @return bool|string
-   */
+    /**
+     * Destroy and re-create sandbox directory for testing.
+     *
+     * Sandbox is a mirror of tests/fixtures/sandbox, located in a temp dir.
+     *
+     * @return bool|string
+     */
     protected function makeSandbox()
     {
         $tmp = getenv('ARTIFICE_TMP') ?: sys_get_temp_dir();
