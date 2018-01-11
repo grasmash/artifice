@@ -79,7 +79,8 @@ class GenerateArtifactCommand extends BaseCommand
     /**
      * @param bool $simulate
      */
-    public function setSimulate($simulate) {
+    public function setSimulate($simulate)
+    {
         $this->simulate = $simulate;
     }
 
@@ -207,7 +208,8 @@ class GenerateArtifactCommand extends BaseCommand
     /**
      * @return mixed
      */
-    public function getCommitMessage() {
+    public function getCommitMessage()
+    {
         return $this->commitMessage;
     }
 

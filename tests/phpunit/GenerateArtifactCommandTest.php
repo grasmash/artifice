@@ -101,7 +101,8 @@ class GenerateArtifactCommandTest extends CommandTestBase
     /**
      * Test that --commit-msg sets commit message correctly.
      */
-    public function testSetCommitMessage() {
+    public function testSetCommitMessage()
+    {
         $this->application->setIo(new BufferIO());
         $commit_msg = 'Test commit message.';
         $input = new ArrayInput(
@@ -115,7 +116,8 @@ class GenerateArtifactCommandTest extends CommandTestBase
     /**
      * Test that user is prompted for commit message when none is provided.
      */
-    public function testAskCommitMessage() {
+    public function testAskCommitMessage()
+    {
         $args = [ '--dry-run' => true ];
         $options = [ 'interactive' => true ];
         $commit_msg = 'Test commit message.';
@@ -161,7 +163,8 @@ class GenerateArtifactCommandTest extends CommandTestBase
     /**
      * Test that using --tag deploys tag.
      */
-    public function testDeployTagOption() {
+    public function testDeployTagOption()
+    {
         $args = [ '--tag' => '1.0.0' ];
         $options = [ 'interactive' => false ];
         $this->command->setSimulate(true);
@@ -172,7 +175,8 @@ class GenerateArtifactCommandTest extends CommandTestBase
     /**
      * Test that using --tag deploys branch.
      */
-    public function testDeployBranchOption() {
+    public function testDeployBranchOption()
+    {
         $args = [ '--branch' => 'test' ];
         $options = [ 'interactive' => false ];
         $this->command->setSimulate(true);
@@ -183,7 +187,8 @@ class GenerateArtifactCommandTest extends CommandTestBase
     /**
      * Test that using --tag deploys tag.
      */
-    public function testDeployTagAndBranchOptions() {
+    public function testDeployTagAndBranchOptions()
+    {
         $args = [
             '--tag' => '1.0.0',
             '--branch' => 'test',
