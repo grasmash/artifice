@@ -24,6 +24,7 @@ class PluginTest extends CommandTestBase
      */
     public function testComposerCommandsAvailable($expected)
     {
+        // Code executed in `composer list` is not counted under code coverage.
         $process = new Process('COMPOSER_ALLOW_XDEBUG=1 composer list', $this->sandbox);
         $process->run();
         $this->assertContains($expected, $process->getOutput());
