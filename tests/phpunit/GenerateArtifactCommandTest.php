@@ -112,7 +112,7 @@ class GenerateArtifactCommandTest extends CommandTestBase
         $this->assertContains("Would you like to create a tag", $this->commandTester->getDisplay(true));
     }
 
-    protected function assertImpossible(): void
+    protected function assertImpossible()
     {
         $this->assertEquals(
             1,
