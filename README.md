@@ -1,4 +1,4 @@
-[![Build Status](https://travis-ci.org/grasmash/artifice.svg?branch=master)](https://travis-ci.org/grasmash/artifice)
+[![Build Status](https://travis-ci.org/grasmash/artifice.svg?branch=master)](https://travis-ci.org/grasmash/artifice) [![Coverage Status](https://coveralls.io/repos/github/grasmash/artifice/badge.svg?branch=master)](https://coveralls.io/github/grasmash/artifice?branch=master)
 
 ## Install
 
