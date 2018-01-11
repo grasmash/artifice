@@ -14,6 +14,7 @@ class GenerateArtifactCommand extends BaseCommand
 {
 
     protected $commitMessage;
+    protected $simulate = false;
 
     public function configure()
     {
@@ -76,11 +77,21 @@ class GenerateArtifactCommand extends BaseCommand
     }
 
     /**
+     * @param bool $simulate
+     */
+    public function setSimulate($simulate) {
+        $this->simulate = $simulate;
+    }
+
+    /**
      * Creates artifact, cuts new tag, and pushes.
      */
     protected function deployToTag($input)
     {
         $this->say("Deploying to tag!");
+        if ($this->simulate) {
+            return;
+        }
     }
 
     /**
@@ -89,6 +100,9 @@ class GenerateArtifactCommand extends BaseCommand
     protected function deployToBranch($input)
     {
         $this->say("Deploying to branch!");
+        if ($this->simulate) {
+            return;
+        }
     }
 
     /**
@@ -175,7 +189,7 @@ class GenerateArtifactCommand extends BaseCommand
      *
      * @param \Symfony\Component\Console\Input\InputInterface $input
      */
-    protected function setCommitMessage(InputInterface $input)
+    public function setCommitMessage(InputInterface $input)
     {
         $commit_msg_option = $input->getOption('commit-msg');
         if ($commit_msg_option) {
@@ -188,6 +202,13 @@ class GenerateArtifactCommand extends BaseCommand
                 $git_last_commit_message
             );
         }
+    }
+
+    /**
+     * @return mixed
+     */
+    public function getCommitMessage() {
+        return $this->commitMessage;
     }
 
     protected function say($message)

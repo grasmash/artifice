@@ -5,6 +5,7 @@ namespace Grasmash\Artifice\Tests;
 use Composer\IO\BufferIO;
 use Exception;
 use RuntimeException;
+use Symfony\Component\Console\Input\ArrayInput;
 use Symfony\Component\Console\Tester\CommandTester;
 use Webmozart\PathUtil\Path;
 
@@ -22,10 +23,6 @@ class GenerateArtifactCommandTest extends CommandTestBase
         $this->application->add(new TestableGenerateArtifactCommand());
         $this->command = $this->application->find('generate-artifact');
         $this->commandTester = new CommandTester($this->command);
-    }
-
-    public function testComposerCommandAvailable()
-    {
     }
 
     /**
@@ -57,6 +54,7 @@ class GenerateArtifactCommandTest extends CommandTestBase
             '--dry-run' => true,
         ];
         $options = [ 'interactive' => false ];
+        $this->command->setSimulate(true);
         $this->commandTester->execute($args, $options);
 
         $this->assertEquals(0, $this->commandTester->getStatusCode());
@@ -69,6 +67,7 @@ class GenerateArtifactCommandTest extends CommandTestBase
     {
         $args = [ '--dry-run' => true ];
         $options = [ 'interactive' => false ];
+        $this->command->setSimulate(true);
         $this->commandTester->execute($args, $options);
         $this->assertEquals(0, $this->commandTester->getStatusCode());
     }
@@ -84,6 +83,9 @@ class GenerateArtifactCommandTest extends CommandTestBase
         $this->assertEquals($expected, $actual);
     }
 
+    /**
+     * Test behavior when .git is missing from project root.
+     */
     public function testNoCommitMessage()
     {
         $this->fs->remove([ Path::canonicalize($this->sandbox . "/.git") ]);
@@ -94,6 +96,38 @@ class GenerateArtifactCommandTest extends CommandTestBase
         } catch (RuntimeException $e) {
             $this->assertContains("Unable to find any git history!", $e->getMessage());
         }
+    }
+
+    /**
+     * Test that --commit-msg sets commit message correctly.
+     */
+    public function testSetCommitMessage() {
+        $this->application->setIo(new BufferIO());
+        $commit_msg = 'Test commit message.';
+        $input = new ArrayInput(
+            ['--commit-msg' => $commit_msg],
+            $this->command->getDefinition()
+        );
+        $this->command->setCommitMessage($input);
+        $this->assertEquals($commit_msg, $this->command->getCommitMessage());
+    }
+
+    /**
+     * Test that user is prompted for commit message when none is provided.
+     */
+    public function testAskCommitMessage() {
+        $args = [ '--dry-run' => true ];
+        $options = [ 'interactive' => true ];
+        $commit_msg = 'Test commit message.';
+        $this->commandTester->setInputs([
+            // Would you like to create a tag?
+            'yes',
+            // Enter a valid commit message:
+            $commit_msg,
+        ]);
+        $this->command->setSimulate(true);
+        $this->commandTester->execute($args, $options);
+        $this->assertEquals($commit_msg, $this->command->getCommitMessage());
     }
 
     /**
@@ -112,6 +146,9 @@ class GenerateArtifactCommandTest extends CommandTestBase
         $this->assertContains("Would you like to create a tag", $this->commandTester->getDisplay(true));
     }
 
+    /**
+     * Makes an impossible assertion. Intended to fail.
+     */
     protected function assertImpossible()
     {
         $this->assertEquals(
@@ -121,12 +158,43 @@ class GenerateArtifactCommandTest extends CommandTestBase
         );
     }
 
+    /**
+     * Test that using --tag deploys tag.
+     */
+    public function testDeployTagOption() {
+        $args = [ '--tag' => '1.0.0' ];
+        $options = [ 'interactive' => false ];
+        $this->command->setSimulate(true);
+        $this->commandTester->execute($args, $options);
+        $this->assertContains("Deploying to tag!", $this->commandTester->getDisplay());
+    }
+
+    /**
+     * Test that using --tag deploys branch.
+     */
+    public function testDeployBranchOption() {
+        $args = [ '--branch' => 'test' ];
+        $options = [ 'interactive' => false ];
+        $this->command->setSimulate(true);
+        $this->commandTester->execute($args, $options);
+        $this->assertContains("Deploying to branch!", $this->commandTester->getDisplay());
+    }
+
+    /**
+     * Test that using --tag deploys tag.
+     */
+    public function testDeployTagAndBranchOptions() {
+        $args = [
+            '--tag' => '1.0.0',
+            '--branch' => 'test',
+        ];
+        $options = [ 'interactive' => false ];
+        $this->command->setSimulate(true);
+        $this->commandTester->execute($args, $options);
+        $this->assertContains("Deploying to tag!", $this->commandTester->getDisplay());
+    }
+
     // @todo Write tests:
-    // ga --branch=test
-    // ga --tag=1.0.0
-    // ga --branch=test --tag=1.0.0
-    // ga --commit-msg="Something."
     // test git missing
     // test git < 2
-    // test on empty repo, no commits,
 }

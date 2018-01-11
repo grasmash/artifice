@@ -13,7 +13,7 @@
             <directory suffix=".php">src</directory>
             <exclude>
               <!-- These files are tested, but using shell_exec(), which
-                   prevent code coverage tracking. -->
+                   prevents code coverage tracking. -->
               <file>src/Composer/CommandProvider.php</file>
               <file>src/Composer/Plugin.php</file>
             </exclude>
