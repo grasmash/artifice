@@ -215,7 +215,7 @@ class GenerateArtifactCommand extends BaseCommand
     /**
      * @return string
      */
-    protected function getLastCommitMessage()
+    public function getLastCommitMessage()
     {
         $process = new ProcessExecutor($this->getIO());
         // @todo Handle failure.

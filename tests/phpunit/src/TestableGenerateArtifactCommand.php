@@ -12,7 +12,15 @@ use Symfony\Component\Console\Output\OutputInterface;
 class TestableGenerateArtifactCommand extends GenerateArtifactCommand {
 
     /**
+     * Set io on the test application.
      *
+     * CommandTester sets $this->input and $this->output directly, but the
+     * Composer application does not use those properties directly. Instead,
+     * it uses $this->io as a proxy to input and output.
+     *
+     * We use the tested command's initialize method to set $this->io on the
+     * Composer application. We need to use our own Application class to do
+     * this, since Composer does not provide a setIO() method.
      */
     protected function initialize(InputInterface $input, OutputInterface $output)
     {

@@ -2,7 +2,6 @@
 
 namespace Grasmash\Artifice\Tests;
 
-use Grasmash\Artifice\Composer\GenerateArtifactCommand;
 use Symfony\Component\Console\Tester\CommandTester;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Process\Process;
@@ -11,10 +10,10 @@ use Webmozart\PathUtil\Path;
 abstract class CommandTestBase extends \PHPUnit_Framework_TestCase
 {
 
-    /** @var Application */
+    /** @var \Grasmash\Artifice\Tests\Application */
     protected $application;
 
-    /** @var GenerateArtifactCommand $command */
+    /** @var \Grasmash\Artifice\Tests\TestableGenerateArtifactCommand $command */
     protected $command;
 
     /** @var CommandTester */
@@ -60,9 +59,13 @@ abstract class CommandTestBase extends \PHPUnit_Framework_TestCase
         $composer_json->repositories->artifice->url = $this->artificePath;
         $this->fs->dumpFile($sandbox . "/composer.json", json_encode($composer_json));
         chdir($sandbox);
-        $process = new Process('git init && git add -A && git commit -m "Initial commit."');
+        $process = new Process('git init && git add -A && git commit -m "' . $this->getDefaultCommitMessage() . '"');
         $process->run();
 
         return $sandbox;
+    }
+
+    protected function getDefaultCommitMessage() {
+        return "Initial commit.";
     }
 }

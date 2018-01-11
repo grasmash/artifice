@@ -2,6 +2,8 @@
 
 namespace Grasmash\Artifice\Tests;
 
+use Composer\IO\BufferIO;
+use Exception;
 use RuntimeException;
 use Symfony\Component\Console\Tester\CommandTester;
 use Webmozart\PathUtil\Path;
@@ -48,12 +50,12 @@ class GenerateArtifactCommandTest extends CommandTestBase
         $this->fs->touch([
             Path::canonicalize($this->sandbox . "/dirt.bag")
         ]);
-        $this->commandTester->execute([
+        $args = [
             '--allow-dirty' => true,
             '--dry-run' => true,
-        ],[
-            'interactive' => false,
-        ]);
+        ];
+        $options = [ 'interactive' => false ];
+        $this->commandTester->execute($args, $options);
 
         $this->assertEquals(0, $this->commandTester->getStatusCode());
     }
@@ -63,23 +65,31 @@ class GenerateArtifactCommandTest extends CommandTestBase
      */
     public function testCleanRepo()
     {
-        $this->makeSandbox();
-        // @todo Make this a dry run and as low impact as possible.
-        $this->commandTester->execute([
-            '--dry-run' => true,
-        ], [
-            'interactive' => false,
-        ]);
+        $args = [ '--dry-run' => true ];
+        $options = [ 'interactive' => false ];
+        $this->commandTester->execute($args, $options);
         $this->assertEquals(0, $this->commandTester->getStatusCode());
     }
 
     public function testGetLastCommitMessage() {
-
+        $expected = $this->getDefaultCommitMessage();
+        $this->application->setIo(new BufferIO());
+        $actual = $this->command->getLastCommitMessage();
+        $this->assertEquals($expected, $actual);
     }
 
+    /**
+     *
+     */
     public function testCreateTagQuestion() {
-        $this->makeSandbox();
-        $this->commandTester->execute([]);
+        try {
+            $this->commandTester->execute([]);
+        }
+        catch (Exception $e) {
+            // An "abort" RuntimeException will be throw by the QuestionHelper
+            // when a question goes unanswered. Ignore it, we just want to
+            // assert that the question was asked.
+        }
         $this->assertContains("Would you like to create a tag", $this->commandTester->getDisplay(TRUE));
     }
 }
