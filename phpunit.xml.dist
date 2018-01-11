@@ -11,6 +11,10 @@
     <filter>
         <whitelist processUncoveredFilesFromWhitelist="true">
             <directory suffix=".php">src</directory>
+            <exclude>
+              <file>src/CommandProvider.php</file>
+              <file>src/Plugin.php</file>
+            </exclude>
         </whitelist>
     </filter>
 </phpunit>

@@ -8,9 +8,6 @@ use Composer\Plugin\Capable;
 use Composer\Plugin\PluginInterface;
 use Composer\Util\ProcessExecutor;
 
-/**
- * @codeCoverageIgnore
- */
 class Plugin implements PluginInterface, Capable
 {
     protected $composer;
