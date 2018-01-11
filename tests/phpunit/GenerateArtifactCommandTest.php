@@ -38,6 +38,7 @@ class GenerateArtifactCommandTest extends CommandTestBase
         ]);
         try {
             $this->commandTester->execute([]);
+            $this->assertImpossible();
         } catch (RuntimeException $e) {
             $this->assertContains("There are uncommitted changes", $e->getMessage());
         }
@@ -83,6 +84,18 @@ class GenerateArtifactCommandTest extends CommandTestBase
         $this->assertEquals($expected, $actual);
     }
 
+    public function testNoCommitMessage()
+    {
+        $this->fs->remove([ Path::canonicalize($this->sandbox . "/.git") ]);
+        $this->application->setIo(new BufferIO());
+        try {
+            $this->command->getLastCommitMessage();
+            $this->assertImpossible();
+        } catch (RuntimeException $e) {
+            $this->assertContains("Unable to find any git history!", $e->getMessage());
+        }
+    }
+
     /**
      * Test that user is prompted to create tag when no args are provided.
      */
@@ -90,6 +103,7 @@ class GenerateArtifactCommandTest extends CommandTestBase
     {
         try {
             $this->commandTester->execute([]);
+            $this->assertImpossible();
         } catch (Exception $e) {
             // An "abort" RuntimeException will be throw by the QuestionHelper
             // when a question goes unanswered. Ignore it, we just want to
@@ -97,4 +111,22 @@ class GenerateArtifactCommandTest extends CommandTestBase
         }
         $this->assertContains("Would you like to create a tag", $this->commandTester->getDisplay(true));
     }
+
+    protected function assertImpossible(): void
+    {
+        $this->assertEquals(
+            1,
+            2,
+            "This assertion should be unreachable. An exception should have been thrown."
+        );
+    }
+
+    // @todo Write tests:
+    // ga --branch=test
+    // ga --tag=1.0.0
+    // ga --branch=test --tag=1.0.0
+    // ga --commit-msg="Something."
+    // test git missing
+    // test git < 2
+    // test on empty repo, no commits,
 }

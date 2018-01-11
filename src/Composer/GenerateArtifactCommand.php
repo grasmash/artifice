@@ -218,8 +218,11 @@ class GenerateArtifactCommand extends BaseCommand
     public function getLastCommitMessage()
     {
         $process = new ProcessExecutor($this->getIO());
-        // @todo Handle failure.
         $exit_code = $process->execute("git log --oneline -1", $output, $this->getRepoRoot());
+        if ($exit_code !== 0) {
+            throw new RuntimeException("Unable to find any git history!");
+        }
+
         $log = explode(' ', $output, 2);
         $git_last_commit_message = trim($log[1]);
 

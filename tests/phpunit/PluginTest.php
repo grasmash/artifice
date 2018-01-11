@@ -2,6 +2,8 @@
 
 namespace Grasmash\Artifice\Tests;
 
+use Symfony\Component\Process\Process;
+
 class PluginTest extends CommandTestBase
 {
 
@@ -22,10 +24,9 @@ class PluginTest extends CommandTestBase
      */
     public function testComposerCommandsAvailable($expected)
     {
-        chdir($this->sandbox);
-        // Allow xdebug so that code coverage is tracked.
-        $output = shell_exec("COMPOSER_ALLOW_XDEBUG=1 composer list");
-        $this->assertContains($expected, $output);
+        $process = new Process('COMPOSER_ALLOW_XDEBUG=1 composer list', $this->sandbox);
+        $process->run();
+        $this->assertContains($expected, $process->getOutput());
     }
     /**
      * Provides values to testComposerCommandsAvailable().
