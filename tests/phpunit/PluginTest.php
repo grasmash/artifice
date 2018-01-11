@@ -23,7 +23,8 @@ class PluginTest extends CommandTestBase
     public function testComposerCommandsAvailable($expected)
     {
         chdir($this->sandbox);
-        $output = shell_exec("composer list");
+        // Allow xdebug so that code coverage is tracked.
+        $output = shell_exec("COMPOSER_ALLOW_XDEBUG=1 composer list");
         $this->assertContains($expected, $output);
     }
     /**
