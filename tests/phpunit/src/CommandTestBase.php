@@ -22,8 +22,12 @@ abstract class CommandTestBase extends \PHPUnit_Framework_TestCase
     /** @var Filesystem */
     protected $fs;
 
-    /** @var String */
+    /** @var string */
     protected $artificePath;
+
+    /** @var string */
+    protected $sandbox;
+
 
     /**
      * {@inheritdoc}

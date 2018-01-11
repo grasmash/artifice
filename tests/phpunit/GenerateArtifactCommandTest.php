@@ -11,8 +11,6 @@ use Webmozart\PathUtil\Path;
 class GenerateArtifactCommandTest extends CommandTestBase
 {
 
-    protected $sandbox;
-
     /**
      * {@inheritdoc}
      *
@@ -24,6 +22,10 @@ class GenerateArtifactCommandTest extends CommandTestBase
         $this->application->add(new TestableGenerateArtifactCommand());
         $this->command = $this->application->find('generate-artifact');
         $this->commandTester = new CommandTester($this->command);
+    }
+
+    public function testComposerCommandAvailable()
+    {
     }
 
     /**
