@@ -43,7 +43,7 @@ class GenerateArtifactCommandTest extends CommandTestBase
     }
 
     /**
-     * Test that a dirty repo throws a "dirty repo" error.
+     * Test that a dirty repo does no throw a "dirty repo" error when allowed.
      */
     public function testDirtyRepoAllowed()
     {
@@ -71,6 +71,9 @@ class GenerateArtifactCommandTest extends CommandTestBase
         $this->assertEquals(0, $this->commandTester->getStatusCode());
     }
 
+    /**
+     * Test that default git commit message is correct.
+     */
     public function testGetLastCommitMessage() {
         $expected = $this->getDefaultCommitMessage();
         $this->application->setIo(new BufferIO());
@@ -79,7 +82,7 @@ class GenerateArtifactCommandTest extends CommandTestBase
     }
 
     /**
-     *
+     * Test that user is prompted to create tag when no args are provided.
      */
     public function testCreateTagQuestion() {
         try {
