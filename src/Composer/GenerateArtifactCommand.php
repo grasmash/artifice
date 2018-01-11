@@ -143,6 +143,8 @@ class GenerateArtifactCommand extends BaseCommand
     }
 
     /**
+     * @codeCoverageIgnore
+     *
      * @throws \RuntimeException
      */
     protected function prerequisitesAreMet()

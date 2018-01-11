@@ -26,6 +26,20 @@ class GenerateArtifactCommandTest extends CommandTestBase
     }
 
     /**
+     * Test that a missing git repo throws exception.
+     */
+    public function testMissingRepo()
+    {
+        $this->fs->remove([ Path::canonicalize($this->sandbox . "/.git") ]);
+        try {
+            $this->commandTester->execute([]);
+            $this->assertImpossible();
+        } catch (RuntimeException $e) {
+            $this->assertContains("Unable to determine if local git repository is dirty.", $e->getMessage());
+        }
+    }
+
+    /**
      * Test that a dirty repo throws a "dirty repo" error.
      */
     public function testDirtyRepo()
