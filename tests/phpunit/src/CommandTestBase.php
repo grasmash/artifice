@@ -63,7 +63,12 @@ abstract class CommandTestBase extends \PHPUnit_Framework_TestCase
         $composer_json->repositories->artifice->url = $this->artificePath;
         $this->fs->dumpFile($sandbox . "/composer.json", json_encode($composer_json));
         chdir($sandbox);
-        $process = new Process('git init && git add -A && git commit -m "' . $this->getDefaultCommitMessage() . '"');
+        $process = new Process(
+            'composer install' .
+            ' && git init' .
+            ' && git add -A' .
+            ' && git commit -m "' . $this->getDefaultCommitMessage() . '"'
+        );
         $process->run();
 
         return $sandbox;
