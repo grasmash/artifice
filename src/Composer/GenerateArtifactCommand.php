@@ -2,21 +2,37 @@
 
 namespace Grasmash\Artifice\Composer;
 
-use Composer\Util\Filesystem;
+use Composer\Command\BaseCommand;
 use Composer\Util\ProcessExecutor;
+use Gitonomy\Git\Repository;
 use Gitonomy\Git\Reference\Branch;
 use Gitonomy\Git\Reference\Tag;
-use Gitonomy\Git\Repository;
 use RuntimeException;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
-use Composer\Command\BaseCommand;
+use Symfony\Component\Filesystem\Filesystem;
+use Symfony\Component\Filesystem\Exception\IOExceptionInterface;
 
 class GenerateArtifactCommand extends BaseCommand
 {
 
+    /**
+     * Symfony Filesystem used to interact with directories and files.
+     *
+     * @var $fs \Symfony\Component\Filesystem\Filesystem
+     */
+    protected $fs;
+
+    /**
+     * The clone of the repo in $this->deployDir.
+     *
+     * @var $repo \Gitonomy\Git\Repository
+     */
+    protected $repo;
+
     protected $commitMessage;
+    protected $deployDir = 'deploy';
     protected $simulate = false;
 
     public function configure()
@@ -54,6 +70,7 @@ class GenerateArtifactCommand extends BaseCommand
             InputOption::VALUE_NONE,
             "Generate artifact without pushing it upstream."
         );
+        $this->fs = new Filesystem();
     }
 
     /**
@@ -65,16 +82,21 @@ class GenerateArtifactCommand extends BaseCommand
     public function execute(InputInterface $input, OutputInterface $output)
     {
         $this->prerequisitesAreMet();
+        $this->cleanup();
         $this->checkDirty($input->getOption('allow-dirty'));
 
         $create_tag = $this->determineCreateTag($input);
         $this->setCommitMessage($input);
 
+        $this->prepareDeploy();
+
         if ($create_tag) {
-            $this->deployToTag($input);
+            $this->archiveAsTag($input);
         } else {
-            $this->deployToBranch($input);
+            $this->archiveAsBranch($input);
         }
+
+        $this->cleanup();
 
         return 0;
     }
@@ -88,30 +110,111 @@ class GenerateArtifactCommand extends BaseCommand
     }
 
     /**
-     * Creates artifact, cuts new tag, and pushes.
+     * Generates a tag with the artifact and pushes it to the local repo.
      */
-    protected function deployToTag($input)
+    protected function archiveAsTag($input)
     {
-        $this->say("Deploying to tag!");
-        if ($this->simulate) {
-            return;
-        }
+        $this->say("Saving locally as tag.");
+        $tag = 'artifact-' . $this->runCommand('git rev-parse HEAD');
+        $this->repo->run('tag', [$tag]);
+        $this->pushLocal("tags/$tag");
     }
 
     /**
-     * Creates artifact on branch and pushes.
+     * Pushes the artifact branch to the local repo.
      */
-    protected function deployToBranch($input)
+    protected function archiveAsBranch($input)
     {
-        $this->say("Deploying to branch!");
-        if ($this->simulate) {
-            return;
-        }
+        $this->say("Saving locally as branch.");
+        $this->pushLocal('artifact-' . $this->getCurrentBranch())
     }
 
+    /**
+     * Creates an optimized artifact on a new branch inside a deploy directory
+     * with the upstream set to the local checkout.
+     */
     protected function prepareDeploy()
     {
+        $this->createDirectory();
+        $this->intitalizeGit();
+        $this->build();
+        $this->createBranch();
+    }
 
+    /**
+     * Removes the generated deploy directory.
+     */
+    protected function cleanup()
+    {
+        $this->fs->remove($this->deployDir);
+    }
+
+    /**
+     * Pushes a reference from the deploy directory back into the main local
+     * checkout.
+     *
+     * @param string $reference
+     *   The tag or branch name to push.
+     */
+    protected function pushLocal($reference)
+    {
+        $this->repo->run('push', ['origin', $reference, '--force']);
+    }
+
+    protected function createBranch()
+    {
+        $this->repo->run('checkout', ['-b', 'artifact-' . $this->getCurrentBranch()]);
+        $this->fs->remove($this->deployDir . '/.gitignore');
+        $this->cleanSubmodules('vendor');
+        $this->cleanSubmodules('docroot');
+        $this->repo->run('add', ['-A']);
+        $this->repo->run('commit', ['-m', $this->commitMessage]);
+    }
+
+    protected function createDirectory()
+    {
+        $this->say("Preparing artifact directory...");
+        $this->fs->mkdir($this->deployDir);
+    }
+
+    protected function cleanSubmodules($dir) {
+        $this->runCommand("find '$this->deployDir/$dir' -type d | grep '\.git' | xargs rm -rf");
+    }
+
+    /**
+     * Initializes git and does a local checkout.
+     */
+    protected function intitalizeGit()
+    {
+        $this->say('Initializing git');
+        // Use the local repo as the source for cloning because the current
+        // branch isn't necessarily pushed to a remote.
+        $source = $this->runCommand('pwd');
+        $deployDir = $this->deployDir;
+        $branch = $this->getCurrentBranch();
+        $this->runCommand("git clone --branch $branch $source $deployDir");
+        $this->repo = new Repository($this->deployDir);
+    }
+
+    protected function build() {
+        $this->say("Building production-optimized codebase...");
+        $this->runCommand('composer install --no-dev --optimize-autoloader', null, $this->deployDir);
+    }
+
+    /**
+     * @param string $name
+     *   The name of the git remote.
+     *
+     * @return string
+     *   The name of the configured git remote.
+     */
+    protected function getGitRemotes($name = 'origin')
+    {
+        return $this->runCommand("git config --get remote.$name.url");
+    }
+    protected function getCurrentBranch()
+    {
+        return $this->runCommand('git rev-parse --abbrev-ref HEAD');
     }
 
     /**
@@ -250,16 +353,37 @@ class GenerateArtifactCommand extends BaseCommand
      */
     public function getLastCommitMessage()
     {
-        $process = new ProcessExecutor($this->getIO());
-        $exit_code = $process->execute("git log --oneline -1", $output, $this->getRepoRoot());
-        if ($exit_code !== 0) {
-            throw new RuntimeException("Unable to find any git history!");
-        }
-
+        $output = $this->runCommand(
+            'git log --oneline -1',
+            "Unable to find any git history!",
+            $this->getRepoRoot()
+        );
         $log = explode(' ', $output, 2);
         $git_last_commit_message = trim($log[1]);
 
         return $git_last_commit_message;
+    }
+
+    /**
+     * Wrapper method around Symfony's ProcessExecutor.
+     *
+     * @param string $command
+     * @param string $error_msg
+     * @param string $cwd
+     *
+     * @return string
+     *   The output of the command if successful.
+     */
+    protected function runCommand($command, $error_msg = null, $cwd = null) {
+        $process = new ProcessExecutor($this->getIO());
+        $exit_code = $process->execute($command, $output, $cwd);
+        if ($exit_code !== 0) {
+            if (!$error_msg) {
+                $error_msg = "Command $command returned a non-zero exit status.";
+            }
+            throw new RuntimeException($error_msg);
+        }
+        return trim($output);
     }
 
     /**
@@ -281,9 +405,8 @@ class GenerateArtifactCommand extends BaseCommand
     public function getVendorPath()
     {
         $config = $this->getComposer()->getConfig();
-        $filesystem = new Filesystem();
-        $filesystem->ensureDirectoryExists($config->get('vendor-dir'));
-        $vendorPath = $filesystem->normalizePath(realpath($config->get('vendor-dir')));
+        $this->fs->exists($config->get('vendor-dir'));
+        $vendorPath = $this->fs->makePathRelative(realpath($config->get('vendor-dir')), '.');
 
         return $vendorPath;
     }
