@@ -4,6 +4,9 @@ namespace Grasmash\Artifice\Composer;
 
 use Composer\Util\Filesystem;
 use Composer\Util\ProcessExecutor;
+use Gitonomy\Git\Reference\Branch;
+use Gitonomy\Git\Reference\Tag;
+use Gitonomy\Git\Repository;
 use RuntimeException;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
@@ -104,6 +107,11 @@ class GenerateArtifactCommand extends BaseCommand
         if ($this->simulate) {
             return;
         }
+    }
+
+    protected function prepareDeploy()
+    {
+
     }
 
     /**
