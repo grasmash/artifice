@@ -126,7 +126,7 @@ class GenerateArtifactCommand extends BaseCommand
     protected function archiveAsBranch($input)
     {
         $this->say("Saving locally as branch.");
-        $this->pushLocal('artifact-' . $this->getCurrentBranch())
+        $this->pushLocal('artifact-' . $this->getCurrentBranch());
     }
 
     /**
