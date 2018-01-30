@@ -13,9 +13,20 @@ use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Filesystem\Exception\IOExceptionInterface;
+use Psr\Log\InvalidArgumentException;
 
 class GenerateArtifactCommand extends BaseCommand
 {
+
+    protected $createBranch = false;
+    protected $createTag = false;
+    protected $pushRemote = false;
+    protected $cleanup = true;
+
+    /**
+     * @var \Grasmash\Artifice\Composer\ArtifactConfiguration
+     */
+    protected $config;
 
     /**
      * Symfony Filesystem used to interact with directories and files.
@@ -35,22 +46,37 @@ class GenerateArtifactCommand extends BaseCommand
     protected $deployDir = 'deploy';
     protected $simulate = false;
 
+    /**
+     * {@inheritDoc}
+     */
+    protected function initialize(InputInterface $input, OutputInterface $output)
+    {
+        parent::initialize($input, $output);
+        $this->config = new ArtifactConfiguration();
+    }
+
     public function configure()
     {
         $this->setName('generate-artifact');
         $this->setDescription("Generate an deployment-ready artifact for a Drupal application.");
         $this->setAliases(['ga']);
         $this->addOption(
+            'output-references',
+            null,
+            InputOption::VALUE_REQUIRED,
+            'The reference types in which to store the resulting artifact.'
+        );
+        $this->addOption(
+            'remote',
+            null,
+            InputOption::VALUE_REQUIRED,
+            'The name of the git remote to which the generated artifact references should be pushed.'
+        );
+        $this->addOption(
             'branch',
             null,
             InputOption::VALUE_REQUIRED,
             "The name of the git branch for the artifact. The tag is cut from this branch."
-        );
-        $this->addOption(
-            'tag',
-            null,
-            InputOption::VALUE_REQUIRED,
-            "The name of the git tag for the artifact. E.g., 1.0.0."
         );
         $this->addOption(
             'commit-msg',
@@ -81,20 +107,31 @@ class GenerateArtifactCommand extends BaseCommand
      */
     public function execute(InputInterface $input, OutputInterface $output)
     {
-        $this->prerequisitesAreMet();
         $this->cleanup();
+        $this->prerequisitesAreMet();
         $this->checkDirty($input->getOption('allow-dirty'));
 
-        $create_tag = $this->determineCreateTag($input);
-        $this->setCommitMessage($input);
+        $config = $this->config->getConfigTreeBuilder()->buildTree();
+        $this->artifact($config);
+
+        $output_refs = $this->determineOutputRefs($input);
+
+        $remotes = $this->getGitRemotes();
+        if ($remotes) {
+            $pushRemote = $this->askRemotes();
+        }
+
+        if ($this->createBranch) {
+            $this->pushLocal('artifact-' . $this->getCurrentBranch());
+        }
+        if ($this->createTag) {
+            $tag = 'artifact-' . $this->runCommand('git rev-parse HEAD');
+            $this->repo->run('tag', [$tag]);
+            $this->pushLocal("tags/$tag");
+        }
 
         $this->prepareDeploy();
-
-        if ($create_tag) {
-            $this->archiveAsTag($input);
-        } else {
-            $this->archiveAsBranch($input);
-        }
+        $this->setCommitMessage($input);
 
         $this->cleanup();
 
@@ -202,15 +239,14 @@ class GenerateArtifactCommand extends BaseCommand
     }
 
     /**
-     * @param string $name
-     *   The name of the git remote.
+     * An array of configured git remotes.
      *
-     * @return string
+     * @return array
      *   The name of the configured git remote.
      */
-    protected function getGitRemotes($name = 'origin')
+    protected function getGitRemotes()
     {
-        return $this->runCommand("git config --get remote.$name.url");
+        return explode("\n", $this->runCommand("git remote"));
     }
     protected function getCurrentBranch()
     {
@@ -336,19 +372,6 @@ class GenerateArtifactCommand extends BaseCommand
     }
 
     /**
-     * @return bool
-     */
-    protected function askCreateTag($default)
-    {
-        $this->say("Typically, you would only create a tag if you currently have a tag checked out on your source repository.");
-        $default_label = $default ? 'yes' : 'no';
-        return $this->getIO()->askConfirmation(
-            "Would you like to create a tag [<comment>$default_label</comment>]? ",
-            $default
-        );
-    }
-
-    /**
      * @return string
      */
     public function getLastCommitMessage()
@@ -411,25 +434,62 @@ class GenerateArtifactCommand extends BaseCommand
         return $vendorPath;
     }
 
-    /**
-     * @param \Symfony\Component\Console\Input\InputInterface $input
-     *
-     * @return bool
-     */
-    protected function determineCreateTag(InputInterface $input)
+
+    protected function determineOutputRefs(InputInterface $input)
     {
-        // Create tag when --tag is set, even if --branch is also set.
-        if ($input->getOption('tag')) {
-            return true;
+        if ($input->getOption('output-references')) {
+            //return $input->getOption('output-references');
         }
 
-        // Do not create tag if only --branch is set.
-        if ($input->getOption('branch')) {
+        return $this->askOutputRefs();
+    }
+
+    protected function askOutputRefs() {
+        $options = [
+            0 => 'Branch',
+            1 => 'Tag',
+            2 => 'Branch and Tag',
+        ];
+        $refs = $this->getIO()->select('Do you want to create a branch, tag, or both?', $options, 'Branch');
+        return self::normalizeRefs($refs);
+    }
+
+    protected function normalizeRefs($ref) {
+        switch (strtolower($ref)) {
+            case 'branch':
+                $this->createBranch = true;
+                break;
+            case 'tag':
+                $this->createTag = true;
+                break;
+            case 'branch and tag' || 'both':
+                $this->createBranch = true;
+                $this->createTag = true;
+                break;
+            default:
+                throw new InvalidArgumentException("$ref is not a valid Reference.");
+        }
+    }
+
+    protected function askRemotes() {
+        $push = $this->getIO()->askConfirmation('Would you like to push the resulting [tag/branch/both] to one of your remotes?', 'yes');
+        if ($push) {
+            if (count($this->getGitRemotes() > 1)) {
+                $remote = $this->askWhichRemote();
+            }
+            else {
+                $remote = reset($this->getGitRemotes());
+            }
+            return $remote;
+        }
+        else {
             return false;
         }
-
-        // If the user has not specified a tag or a branch, ask what to do.
-        // Defaults to TRUE if --no-interaction.
-        return $this->askCreateTag(true);
     }
+
+    protected function askWhichRemote() {
+        $options = $this->getGitRemotes();
+        return $this->getIO()->select('Which remote would you like to push the references to?', $options, null);
+    }
+
 }
