@@ -213,6 +213,16 @@ class GenerateArtifactCommandTest extends CommandTestBase
         $this->assertContains("Deploying to tag!", $this->commandTester->getDisplay());
     }
 
+    /**
+     *
+     */
+    public function testDetermineOutputRefs()
+    {
+        $args = [];
+        $options = [ 'interactive' => false ];
+        $this->commandTester->execute($args, $options);
+    }
+
     // @todo Write tests:
     // test git missing
     // test git < 2

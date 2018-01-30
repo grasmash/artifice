@@ -20,13 +20,13 @@ class GenerateArtifactCommand extends BaseCommand
 
     protected $createBranch = false;
     protected $createTag = false;
-    protected $pushRemote = false;
-    protected $cleanup = true;
+    protected $remote = null;
+    protected $cleanupLocal = false;
+    protected $cleanupDeploy = true;
 
-    /**
-     * @var \Grasmash\Artifice\Composer\ArtifactConfiguration
-     */
-    protected $config;
+    protected $refs;
+    protected $branchName;
+    protected $tagName;
 
     /**
      * Symfony Filesystem used to interact with directories and files.
@@ -52,7 +52,7 @@ class GenerateArtifactCommand extends BaseCommand
     protected function initialize(InputInterface $input, OutputInterface $output)
     {
         parent::initialize($input, $output);
-        $this->config = new ArtifactConfiguration();
+        $this->fs = new Filesystem();
     }
 
     public function configure()
@@ -61,16 +61,22 @@ class GenerateArtifactCommand extends BaseCommand
         $this->setDescription("Generate an deployment-ready artifact for a Drupal application.");
         $this->setAliases(['ga']);
         $this->addOption(
-            'output-references',
+            'create_branch',
             null,
-            InputOption::VALUE_REQUIRED,
-            'The reference types in which to store the resulting artifact.'
+            InputOption::VALUE_NONE,
+            'Whether or not the resulting artifact should be saved as a Git branch.'
+        );
+        $this->addOption(
+            'create_tag',
+            null,
+            InputOption::VALUE_NONE,
+            'Whether or not the resulting artifact should be saved as a Git tag.'
         );
         $this->addOption(
             'remote',
             null,
             InputOption::VALUE_REQUIRED,
-            'The name of the git remote to which the generated artifact references should be pushed.'
+            'The name of the git remote to which the generated artifact references should be pushed. References will not be pushed if this is empty.'
         );
         $this->addOption(
             'branch',
@@ -79,24 +85,29 @@ class GenerateArtifactCommand extends BaseCommand
             "The name of the git branch for the artifact. The tag is cut from this branch."
         );
         $this->addOption(
-            'commit-msg',
+            'commit_msg',
             null,
             InputOption::VALUE_REQUIRED,
             "The git commit message for the artifact commit."
         );
         $this->addOption(
-            'allow-dirty',
+            'allow_dirty',
             null,
             InputOption::VALUE_NONE,
             "Allow artifact to be generated despite uncommitted changes in local git repository."
         );
         $this->addOption(
-            'dry-run',
+            'cleanup_local',
             null,
             InputOption::VALUE_NONE,
-            "Generate artifact without pushing it upstream."
+            "Whether or not to remove the references from the local repo when finished."
         );
-        $this->fs = new Filesystem();
+        $this->addOption(
+            'cleanup_deploy',
+            null,
+            InputOption::VALUE_NONE,
+            "Whether or not to remove the deploy sub-directory when finished."
+        );
     }
 
     /**
@@ -107,35 +118,45 @@ class GenerateArtifactCommand extends BaseCommand
      */
     public function execute(InputInterface $input, OutputInterface $output)
     {
-        $this->cleanup();
+        $this->cleanupDeploy();
         $this->prerequisitesAreMet();
-        $this->checkDirty($input->getOption('allow-dirty'));
+        $this->checkDirty($input->getOption('allow_dirty'));
 
-        $config = $this->config->getConfigTreeBuilder()->buildTree();
-        $this->artifact($config);
+        $this->determineOutputRefs($input);
 
-        $output_refs = $this->determineOutputRefs($input);
+        $this->determineRemotes($input);
 
-        $remotes = $this->getGitRemotes();
-        if ($remotes) {
-            $pushRemote = $this->askRemotes();
-        }
+        $this->determineCleanup($input);
+
+        $this->setCommitMessage($input);
+        $this->prepareDeploy();
 
         if ($this->createBranch) {
-            $this->pushLocal('artifact-' . $this->getCurrentBranch());
+            $this->branchName = 'artifact-' . $this->getCurrentBranch();
+            $this->pushLocal($this->branchName);
         }
         if ($this->createTag) {
-            $tag = 'artifact-' . $this->runCommand('git rev-parse HEAD');
-            $this->repo->run('tag', [$tag]);
-            $this->pushLocal("tags/$tag");
+            $this->tagName = 'artifact-' . $this->runCommand('git rev-parse HEAD');
+            $this->repo->run('tag', [$this->tagName]);
+            $this->pushLocal("tags/$this->tagName");
+        }
+        if ($this->remote) {
+            $this->pushRemote();
         }
 
-        $this->prepareDeploy();
-        $this->setCommitMessage($input);
+        if ($this->cleanupDeploy) {
+            $this->cleanupDeploy();
+        }
 
-        $this->cleanup();
+        if ($this->cleanupLocal) {
+            $this->cleanupLocal();
+        }
 
         return 0;
+    }
+
+    protected function getOptions() {
+
     }
 
     /**
@@ -181,9 +202,17 @@ class GenerateArtifactCommand extends BaseCommand
     /**
      * Removes the generated deploy directory.
      */
-    protected function cleanup()
+    protected function cleanupDeploy()
     {
         $this->fs->remove($this->deployDir);
+    }
+
+    /**
+     * Removes the generated references from the local repo.
+     */
+    protected function cleanupLocal()
+    {
+        // Remove the refs
     }
 
     /**
@@ -196,6 +225,18 @@ class GenerateArtifactCommand extends BaseCommand
     protected function pushLocal($reference)
     {
         $this->repo->run('push', ['origin', $reference, '--force']);
+    }
+
+    protected function pushRemote()
+    {
+        if ($this->createBranch) {
+            $this->say("Pushing artifact branch to $this->remote.");
+            $this->runCommand("git push $this->remote $this->branchName");
+        }
+        if ($this->createTag) {
+            $this->say("Pushing artifact tag to $this->remote.");
+            $this->runCommand("git push $this->remote tags/$this->tagName");
+        }
     }
 
     protected function createBranch()
@@ -327,7 +368,7 @@ class GenerateArtifactCommand extends BaseCommand
             if ($allow_dirty) {
                 $this->warn("There are uncommitted changes in your local git repository. Continuing anyway...");
             } else {
-                throw new RuntimeException("There are uncommitted changes in your local git repository! Commit or stash these changes before generating artifact. Use --allow-dirty option to disable this check.");
+                throw new RuntimeException("There are uncommitted changes in your local git repository! Commit or stash these changes before generating artifact. Use --allow_dirty option to disable this check.");
             }
         }
     }
@@ -341,7 +382,7 @@ class GenerateArtifactCommand extends BaseCommand
      */
     public function setCommitMessage(InputInterface $input)
     {
-        $commit_msg_option = $input->getOption('commit-msg');
+        $commit_msg_option = $input->getOption('commit_msg');
         if ($commit_msg_option) {
             $this->say("Commit message is set to <comment>$commit_msg_option</comment>.");
             $this->commitMessage = $commit_msg_option;
@@ -437,11 +478,17 @@ class GenerateArtifactCommand extends BaseCommand
 
     protected function determineOutputRefs(InputInterface $input)
     {
-        if ($input->getOption('output-references')) {
-            //return $input->getOption('output-references');
+        if ($input->getOption('create_branch')) {
+            $this->createBranch = true;
         }
-
-        return $this->askOutputRefs();
+        if ($input->getOption('create_tag')) {
+            $this->createTag = true;
+        }
+        if (!$input->getOption('create_branch') && !$input->getOption('create_tag')) {
+            // If either branch or tag options are passed, we assume that we
+            // shouldn't ask about output refs. So we only ask if both are not.
+            $this->askOutputRefs();
+        }
     }
 
     protected function askOutputRefs() {
@@ -450,11 +497,12 @@ class GenerateArtifactCommand extends BaseCommand
             1 => 'Tag',
             2 => 'Branch and Tag',
         ];
-        $refs = $this->getIO()->select('Do you want to create a branch, tag, or both?', $options, 'Branch');
-        return self::normalizeRefs($refs);
+        $this->refs = $this->getIO()->select('Do you want to create a branch, tag, or both?', $options, 'Branch');
+        return self::normalizeRefs($this->refs);
     }
 
-    protected function normalizeRefs($ref) {
+    protected function normalizeRefs($ref)
+    {
         switch (strtolower($ref)) {
             case 'branch':
                 $this->createBranch = true;
@@ -462,7 +510,7 @@ class GenerateArtifactCommand extends BaseCommand
             case 'tag':
                 $this->createTag = true;
                 break;
-            case 'branch and tag' || 'both':
+            case 'branch and tag':
                 $this->createBranch = true;
                 $this->createTag = true;
                 break;
@@ -471,25 +519,36 @@ class GenerateArtifactCommand extends BaseCommand
         }
     }
 
-    protected function askRemotes() {
-        $push = $this->getIO()->askConfirmation('Would you like to push the resulting [tag/branch/both] to one of your remotes?', 'yes');
-        if ($push) {
+    protected function determineRemotes(InputInterface $input)
+    {
+        if ($input->getOption('remote')) {
+            $this->validateRemote($input->getOption('remote'));
+            $this->remote = $input->getOption('remote');
+        }
+        elseif ($this->getIO()->askConfirmation('Would you like to push the resulting ' . $this->refs . ' to one of your remotes? [yes/no]', false)) {
             if (count($this->getGitRemotes() > 1)) {
-                $remote = $this->askWhichRemote();
+                $options = $this->getGitRemotes();
+                $remote = $this->getIO()->select('Which remote would you like to push the references to?', $options, null);
             }
             else {
                 $remote = reset($this->getGitRemotes());
             }
-            return $remote;
-        }
-        else {
-            return false;
+            $this->remote = $remote;
         }
     }
 
-    protected function askWhichRemote() {
-        $options = $this->getGitRemotes();
-        return $this->getIO()->select('Which remote would you like to push the references to?', $options, null);
+    protected function validateRemote($remote)
+    {
+        $remotes = $this->getGitRemotes();
+        if (!in_array($remote, $remotes)) {
+            throw new InvalidArgumentException("You asked to push references to $remote, but no configured remote has that name. You have the following configured remotes: " . implode(', ', $remotes));
+        }
     }
 
+    protected function determineCleanup(InputInterface $input)
+    {
+        if ($input->getOption('cleanup_local')) {
+
+        }
+    }
 }
