@@ -56,7 +56,7 @@ class GenerateArtifactCommandTest extends CommandTestBase
     }
 
     /**
-     * Test that a dirty repo does no throw a "dirty repo" error when allowed.
+     * Test that a dirty repo does not throw a "dirty repo" error when allowed.
      */
     public function testDirtyRepoAllowed()
     {
@@ -64,11 +64,11 @@ class GenerateArtifactCommandTest extends CommandTestBase
             Path::canonicalize($this->sandbox . "/dirt.bag")
         ]);
         $args = [
-            '--allow-dirty' => true,
-            '--dry-run' => true,
+            '--allow_dirty' => true,
+            '--create_branch' => true,
+            '--create_tag' => false
         ];
         $options = [ 'interactive' => false ];
-        $this->command->setSimulate(true);
         $this->commandTester->execute($args, $options);
 
         $this->assertEquals(0, $this->commandTester->getStatusCode());
@@ -79,9 +79,11 @@ class GenerateArtifactCommandTest extends CommandTestBase
      */
     public function testCleanRepo()
     {
-        $args = [ '--dry-run' => true ];
         $options = [ 'interactive' => false ];
-        $this->command->setSimulate(true);
+        $args = [
+            '--create_branch' => true,
+            '--create_tag' => false,
+        ];
         $this->commandTester->execute($args, $options);
         $this->assertEquals(0, $this->commandTester->getStatusCode());
     }
