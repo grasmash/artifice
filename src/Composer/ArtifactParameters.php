@@ -12,10 +12,8 @@ class ArtifactParameters extends ParameterBag {
             'create_branch' => false,
             'create_tag' => false,
             'remote' => null,
-            'cleanup' => [
-                'local' => false,
-                'artifact' => true,
-            ],
+            'cleanup_local' => false,
+            'save_artifact' => false,
             'commit_message' => null,
             'artifact_dir' => 'artifact',
             'refs_noun' => null,
@@ -23,7 +21,5 @@ class ArtifactParameters extends ParameterBag {
 
         parent::__construct($parameters);
     }
-
-
 
 }

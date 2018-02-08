@@ -4,6 +4,7 @@ namespace Grasmash\Artifice\Tests;
 
 use Composer\IO\BufferIO;
 use Exception;
+use Gitonomy\Git\Repository;
 use RuntimeException;
 use Symfony\Component\Console\Input\ArrayInput;
 use Symfony\Component\Console\Tester\CommandTester;
@@ -115,7 +116,7 @@ class GenerateArtifactCommandTest extends CommandTestBase
     }
 
     /**
-     * Test that --commit-msg sets commit message correctly.
+     * Test that --commit_msg sets commit message correctly.
      */
     public function testSetCommitMessage()
     {
@@ -129,15 +130,76 @@ class GenerateArtifactCommandTest extends CommandTestBase
         $this->assertEquals($commit_msg, $this->command->getCommitMessage());
     }
 
+    public function testInteractiveDefaults()
+    {
+        $args = ['--create_tag' => 'mytag'];
+        $options = ['interactive' => true];
+        $enter = "\r\n";
+        $this->commandTester->setInputs([
+            // Do you want to create a branch, tag, or both?
+            //$enter,
+            // Would you like to push the resulting Tag to one of your remotes?
+            $enter,
+            // Would you like to save the generated artifact directory?
+            $enter,
+            // Enter a valid commit message
+            $enter,
+        ]);
+        $this->commandTester->execute($args, $options);
+        $this->assertEquals(0, $this->commandTester->getStatusCode());
+    }
+
+    /**
+     * Test the default behavior:
+     *   - artifact directory should not be present
+     *   - Should be a tag with commit hash in local repo
+     *   - Should not push to any remotes
+     *   - Should not be a new branch
+     */
+    public function testDefault()
+    {
+        $repo = new Repository(Path::canonicalize($this->sandbox));
+        $tagName = 'artifact-' . trim($repo->run('rev-parse', ['HEAD']));
+
+        $options = [ 'interactive' => false ];
+        // For some reason, ConsoleIO::select has trouble specifically when
+        // run during tests. So I'm passing the default options here for now.
+        $args = ['--create_tag' => $tagName];
+        $this->commandTester->execute($args, $options);
+        $this->assertEquals(0, $this->commandTester->getStatusCode());
+        $this->assertFalse(
+            $this->fs->exists(Path::canonicalize($this->sandbox . '/artifact'))
+        );
+        $this->assertContains("Artifact generation complete!", $this->commandTester->getDisplay(true));
+
+        $tags = explode("\n", $repo->run('tag'));
+        $this->assertArrayHasKey($tagName, array_flip($tags));
+    }
+
+    /**
+     * Test that the --save_artifact option preserves the build directory.
+     */
+    public function testSaveArtifact()
+    {
+        $options = [ 'interactive' => false ];
+        $args = [
+            '--create_branch' => true,
+            '--create_tag' => false,
+            '--save_artifact' => true,
+        ];
+        $this->commandTester->execute($args, $options);
+        $this->assertEquals(0, $this->commandTester->getStatusCode());
+        $this->assertTrue(
+            $this->fs->exists(Path::canonicalize($this->sandbox . '/artifact'))
+        );
+    }
+
     /**
      * Test that user is prompted for commit message when none is provided.
      */
     public function testAskCommitMessage()
     {
-        $args = [
-            '--create_branch' => true,
-            '--create_tag' => false
-        ];
+        $args = [];
         $options = [ 'interactive' => true ];
         $commit_msg = 'Test commit message.';
         $this->commandTester->setInputs([
