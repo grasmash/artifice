@@ -14,6 +14,7 @@ use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\DependencyInjection\ParameterBag\FrozenParameterBag;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Filesystem\Exception\IOExceptionInterface;
+use Symfony\Component\Console\Helper\ProgressBar;
 use Psr\Log\InvalidArgumentException;
 
 class GenerateArtifactCommand extends BaseCommand
@@ -34,7 +35,7 @@ class GenerateArtifactCommand extends BaseCommand
     protected $fs;
 
     /**
-     * The clone of the repo in $this->deployDir.
+     * The clone of the repo in the artifact directory.
      *
      * @var $repo \Gitonomy\Git\Repository
      */
@@ -43,6 +44,7 @@ class GenerateArtifactCommand extends BaseCommand
     public function __construct($name = NULL)
     {
         $this->fs = new Filesystem();
+        $this->artifactParams = new ArtifactParameters([]);
         parent::__construct($name);
     }
 
@@ -52,7 +54,6 @@ class GenerateArtifactCommand extends BaseCommand
     protected function initialize(InputInterface $input, OutputInterface $output)
     {
         parent::initialize($input, $output);
-        $this->artifactParams = new ArtifactParameters([]);
     }
 
     public function configure()
@@ -69,7 +70,7 @@ class GenerateArtifactCommand extends BaseCommand
         $this->addOption(
             'create_tag',
             null,
-            InputOption::VALUE_NONE,
+            InputOption::VALUE_REQUIRED,
             'Whether or not the resulting artifact should be saved as a Git tag.'
         );
         $this->addOption(
@@ -103,10 +104,10 @@ class GenerateArtifactCommand extends BaseCommand
             "Whether or not to remove the references from the local repo when finished."
         );
         $this->addOption(
-            'cleanup_deploy',
+            'cleanup_artifact',
             null,
             InputOption::VALUE_NONE,
-            "Whether or not to remove the deploy sub-directory when finished."
+            "Whether or not to remove the artifact sub-directory when finished."
         );
     }
 
@@ -118,16 +119,16 @@ class GenerateArtifactCommand extends BaseCommand
      */
     public function execute(InputInterface $input, OutputInterface $output)
     {
-        $this->cleanupDeploy();
+        $this->cleanupArtifactDir();
         $this->prerequisitesAreMet();
 
         $this->gatherOptions($input);
-
-        $this->prepareDeploy();
+        $this->prepareArtifactDir();
 
         $referenceInstructions = new FrozenParameterBag($this->artifactParams->all());
         $this->deployRefs($referenceInstructions);
 
+        $this->summarize();
         return 0;
     }
 
@@ -141,10 +142,10 @@ class GenerateArtifactCommand extends BaseCommand
     }
 
     /**
-     * Creates an optimized artifact on a new branch inside a deploy directory
-     * with the upstream set to the local checkout.
+     * Creates an optimized artifact on a new branch inside the artifact
+     * directory with the upstream set to the local checkout.
      */
-    protected function prepareDeploy()
+    protected function prepareArtifactDir()
     {
         $this->createDirectory();
         $this->intitalizeGit();
@@ -153,6 +154,9 @@ class GenerateArtifactCommand extends BaseCommand
     }
 
     /**
+     * Pushes the artifact references to the desired locations and cleans up
+     * according to provided instructions.
+     *
      * @param \Symfony\Component\DependencyInjection\ParameterBag\FrozenParameterBag $referenceInstructions
      */
     protected function deployRefs(FrozenParameterBag $referenceInstructions)
@@ -169,8 +173,9 @@ class GenerateArtifactCommand extends BaseCommand
         }
 
         $cleanup = $referenceInstructions->get('cleanup');
-        if ($cleanup['deploy']) {
-            $this->cleanupDeploy();
+        if ($cleanup['artifact']) {
+            // @todo cleanup artifact seems to be always set to true.
+            $this->cleanupArtifactDir();
         }
 
         if ($cleanup['local']) {
@@ -179,11 +184,11 @@ class GenerateArtifactCommand extends BaseCommand
     }
 
     /**
-     * Removes the generated deploy directory.
+     * Removes the generated artifact directory.
      */
-    protected function cleanupDeploy()
+    protected function cleanupArtifactDir()
     {
-        $this->fs->remove($this->artifactParams->get('deploy_dir'));
+        $this->fs->remove($this->artifactParams->get('artifact_dir'));
     }
 
     /**
@@ -200,7 +205,7 @@ class GenerateArtifactCommand extends BaseCommand
     }
 
     /**
-     * Pushes a reference from the deploy directory back into the main local
+     * Pushes a reference from the artifact directory back into the main local
      * checkout.
      *
      * @param string $reference
@@ -219,21 +224,21 @@ class GenerateArtifactCommand extends BaseCommand
         $remote = $this->artifactParams->get('remote');
         if ($this->artifactParams->get('create_branch')) {
             $this->say("Pushing artifact branch to $remote.");
-            $this->runCommand("git push $remote " . $this->artifactParams->get('branch_name'));
+            $this->runCommand("git push $remote " . $this->artifactParams->get('create_branch'));
         }
         if ($this->artifactParams->get('create_tag')) {
             $this->say("Pushing artifact tag to $remote.");
-            $this->runCommand("git push $remote tags/" . $this->artifactParams->get('tag_name'));
+            $this->runCommand("git push $remote tags/" . $this->artifactParams->get('create_tag'));
         }
     }
 
     /**
-     * Creates a branch for the artifact in the deploy directory.
+     * Creates a branch for the artifact in the artifact directory.
      */
     protected function createBranch()
     {
         $this->repo->run('checkout', ['-b', 'artifact-' . $this->getCurrentBranch()]);
-        $this->fs->remove($this->artifactParams->get('deploy_dir') . '/.gitignore');
+        $this->fs->remove($this->artifactParams->get('artifact_dir') . '/.gitignore');
         $this->cleanSubmodules('vendor');
         $this->cleanSubmodules('docroot');
         $this->repo->run('add', ['-A']);
@@ -246,7 +251,7 @@ class GenerateArtifactCommand extends BaseCommand
     protected function createDirectory()
     {
         $this->say("Preparing artifact directory.");
-        $this->fs->mkdir($this->artifactParams->get('deploy_dir'));
+        $this->fs->mkdir($this->artifactParams->get('artifact_dir'));
     }
 
     /**
@@ -256,8 +261,8 @@ class GenerateArtifactCommand extends BaseCommand
      *   The directory to clean relative to repo root.
      */
     protected function cleanSubmodules($dir) {
-        $deployDir = $this->artifactParams->get('deploy_dir');
-        $this->runCommand("find '$deployDir/$dir' -type d | grep '\.git' | xargs rm -rf");
+        $artifactDir = $this->artifactParams->get('artifact_dir');
+        $this->runCommand("find '$artifactDir/$dir' -type d | grep '\.git' | xargs rm -rf");
     }
 
     /**
@@ -269,19 +274,50 @@ class GenerateArtifactCommand extends BaseCommand
         // Use the local repo as the source for cloning because the current
         // branch isn't necessarily pushed to a remote.
         $source = $this->runCommand('pwd');
-        $deployDir = $this->artifactParams->get('deploy_dir');
+        $artifactDir = $this->artifactParams->get('artifact_dir');
         $branch = $this->getCurrentBranch();
-        $this->runCommand("git clone --branch $branch $source $deployDir");
-        $this->repo = new Repository($deployDir);
+        $this->runCommand("git clone --branch $branch $source $artifactDir");
+        $this->repo = new Repository($artifactDir);
     }
 
     /**
      * Builds a production-optimized codebase with Composer.
      */
-    protected function build() {
-        $this->say('Building production-optimized codebase...');
-        $this->say('This may take awhile.');
-        $this->runCommand('composer install --no-dev --optimize-autoloader', null, $this->artifactParams->get('deploy_dir'));
+    protected function build()
+    {
+        $this->say('Building production-optimized codebase. This may take awhile...');
+        $this->runCommand(
+            'composer install --no-dev --optimize-autoloader',
+            NULL,
+            $this->artifactParams->get('artifact_dir')
+        );
+        $this->say('Finished building codebase.');
+    }
+
+    protected function summarize()
+    {
+        $this->say("Artifact generation complete!");
+        $locations = [];
+        if (!$this->artifactParams->get('cleanup')['artifact']) {
+            $locations['artifact'] = 'locally in the ' . $this->artifactParams->get('artifact_dir') . 'directory';
+        }
+        if (!$this->artifactParams->get('cleanup')['local']) {
+            $locations['local'] = 'locally in your source repo directory';
+        }
+        if ($remote = $this->artifactParams->get('remote')) {
+            $locations['remote'] = 'on the ' . $remote . ' remote';
+        }
+
+        $refs = [];
+        if ($tag = $this->artifactParams->get('create_tag')) {
+            $refs['tag'] = "tag <info>$tag</info>";
+        }
+        if ($branch = $this->artifactParams->get('create_branch')) {
+            $refs['branch'] = "branch <info>$branch</info>";
+        }
+
+        $summary = 'The ' . $this->oxford($refs) . ' ' . $this->getConjunction(count($refs)) . ' available ' . $this->oxford($locations) . '.';
+        $this->say($summary);
     }
 
     /**
@@ -294,6 +330,11 @@ class GenerateArtifactCommand extends BaseCommand
     {
         return explode("\n", $this->runCommand("git remote"));
     }
+
+    /**
+     * @return string
+     *   The name of the current checkout branch in the source repository.
+     */
     protected function getCurrentBranch()
     {
         return $this->runCommand('git rev-parse --abbrev-ref HEAD');
@@ -380,7 +421,6 @@ class GenerateArtifactCommand extends BaseCommand
 
     /**
      * Sets the commit message to be used for committing deployment artifact.
-     *
      * Defaults to the last commit message on the source branch.
      *
      * @param \Symfony\Component\Console\Input\InputInterface $input
@@ -402,9 +442,35 @@ class GenerateArtifactCommand extends BaseCommand
         }
     }
 
+    /**
+     * Sets the name of the tag to be used when create a tag reference of the
+     * artifact. Defaults to the commit hash of the source repo commit.
+     *
+     * @param InputInterface $input
+     */
+    public function setTagName(InputInterface $input)
+    {
+        if ($tag_name_option = $input->getOption('create_tag')) {
+            $this->say("Tag name is set to <comment>$tag_name_option</comment>.");
+            $this->artifactParams->set('create_tag', $tag_name_option);
+        } else {
+            $tagName = 'artifact-' . $this->runCommand('git rev-parse HEAD');
+            $this->artifactParams->set('create_tag',
+                $this->getIO()->ask(
+                    "Enter a name for the tag. E.g. <info>v1.0.0</info>. Otherwise it will default to the current commit hash. [<comment>$tagName</comment>]",
+                    $tagName
+                )
+            );
+        }
+    }
+
     public function getCommitMessage()
     {
         return $this->artifactParams->get('commit_message');
+    }
+    public function getTagName()
+    {
+        return $this->artifactParams->get('create_tag');
     }
     protected function say($message)
     {
@@ -483,15 +549,18 @@ class GenerateArtifactCommand extends BaseCommand
         if ($input->getOption('create_branch')) {
             $branchName = 'artifact-' . $this->getCurrentBranch();
             $this->artifactParams->set('create_branch', $branchName);
+            $this->artifactParams->set('refs_noun', 'Branch');
         }
         if ($input->getOption('create_tag')) {
-            $tagName = 'artifact-' . $this->runCommand('git rev-parse HEAD');
-            $this->artifactParams->set('create_tag', $tagName);
+            $this->setTagName($input);
+            $this->artifactParams->set('refs_noun', 'Tag');
         }
         if (!$input->getOption('create_branch') && !$input->getOption('create_tag')) {
             // If either branch or tag options are passed, we assume that we
             // shouldn't ask about output refs. So we only ask if both are not.
-            $this->askOutputRefs();
+            $this->askOutputRefs($input);
+        } elseif ($input->getOption('create_branch') && $input->getOption('create_tag')) {
+            $this->artifactParams->set('refs_noun', 'Branch and Tag');
         }
     }
 
@@ -504,7 +573,13 @@ class GenerateArtifactCommand extends BaseCommand
         elseif ($this->getIO()->askConfirmation('Would you like to push the resulting ' . $this->artifactParams->get('refs_noun') . ' to one of your remotes? [yes/no]', false)) {
             if (count($this->getGitRemotes() > 1)) {
                 $options = $this->getGitRemotes();
-                $remote = $this->getIO()->select('Which remote would you like to push the references to?', $options, null);
+                $remote = $this
+                    ->getIO()
+                    ->select(
+                        'Which remote would you like to push the references to?',
+                        $options,
+                        reset($options)
+                    );
             }
             else {
                 $remote = reset($this->getGitRemotes());
@@ -518,19 +593,19 @@ class GenerateArtifactCommand extends BaseCommand
         if ($input->getOption('cleanup_local')) {
             $this->artifactParams->set('cleanup_local', true);
         }
-        if ($input->getOption('cleanup_deploy')) {
-            $this->artifactParams->set('cleanup_deploy', true);
+        if ($input->getOption('cleanup_artifact')) {
+            $this->artifactParams->set('cleanup_artifact', true);
         }
 
-        if (!$input->getOption('cleanup_local') && !$input->getOption('cleanup_deploy')) {
-            // If either cleanup_local or cleanup_deploy are passed, we assume
+        if (!$input->getOption('cleanup_local') && !$input->getOption('cleanup_artifact')) {
+            // If either cleanup_local or cleanup_artifact are passed, we assume
             // that we shouldn't ask about cleanup. So we only ask if both are
             // not.
             $this->askCleanup();
         }
     }
 
-    protected function askOutputRefs() {
+    protected function askOutputRefs(InputInterface $input) {
         $options = [
             0 => 'Branch',
             1 => 'Tag',
@@ -543,10 +618,10 @@ class GenerateArtifactCommand extends BaseCommand
                 'Branch'
             )
         );
-        return self::normalizeRefs($this->artifactParams->get('refs_noun'));
+        return self::normalizeRefs($input, $this->artifactParams->get('refs_noun'));
     }
 
-    protected function normalizeRefs($ref)
+    protected function normalizeRefs(InputInterface $input, $ref)
     {
         switch (strtolower($ref)) {
             case 'branch':
@@ -560,8 +635,7 @@ class GenerateArtifactCommand extends BaseCommand
             case 'branch and tag':
                 $branchName = 'artifact-' . $this->getCurrentBranch();
                 $this->artifactParams->set('create_branch', $branchName);
-                $tagName = 'artifact-' . $this->runCommand('git rev-parse HEAD');
-                $this->artifactParams->set('create_tag', $tagName);
+                $this->setTagName($input);
                 break;
             default:
                 throw new InvalidArgumentException("$ref is not a valid Reference.");
@@ -586,7 +660,7 @@ class GenerateArtifactCommand extends BaseCommand
     protected function askCleanup()
     {
         $this->artifactParams->set(
-            'cleanup_deploy',
+            'cleanup_artifact',
             $this
                 ->getIO()
                 ->askConfirmation(
@@ -608,23 +682,54 @@ class GenerateArtifactCommand extends BaseCommand
         }
     }
 
-    protected function determineAskCleanupLocal() {
+    protected function determineAskCleanupLocal()
+    {
         /**
          * It only makes sense to ask if the local refs should be cleaned up
          * under certain circumstances. E.g., if we don't push to a remote, and
-         * do cleanup the deploy directory (i.e. row 1 below), then we must want
-         * to keep the local refs (otherwise there would be no result).
+         * do cleanup the artifact directory (i.e. row 1 below), then we must
+         * want to keep the local refs (otherwise there would be no result).
          *
-         *  remote | cleanup deploy | result
-         * ---------------------------------
-         *  false  | true           | don't ask
-         *  false  | false          | ask
-         *  true   | true           | ask
-         *  true   | false          | ask
+         *  remote | cleanup artifact | result
+         *  ----------------------------------
+         *  false  | true             | don't ask
+         *  false  | false            | ask
+         *  true   | true             | ask
+         *  true   | false            | ask
          */
-        if ($this->artifactParams->get('remote') === null && $this->artifactParams->get('cleanup_deploy')) {
+        if ($this->artifactParams->get('remote') === null && $this->artifactParams->get('cleanup_artifact')) {
             return false;
         }
         return true;
     }
+
+    /**
+     * Formats a set of strings with an Oxford comma.
+     */
+    protected function oxford(array $items, $conjunction = 'and')
+    {
+        $count = count($items);
+        if ($count < 2) {
+            return (string) reset($items);
+        }
+        elseif ($count === 2) {
+            return reset($items) . ' ' . $conjunction . ' ' . end($items);
+        }
+        else {
+            $items[] = $conjunction . ' ' . array_pop($items);
+            return implode(', ', $items);
+        }
+    }
+
+    /**
+     * Returns plural or singular word based on provided count.
+     */
+    protected function getConjunction($n, $conjunction = ['singular' => 'is', 'plural' => 'are'])
+    {
+        if ($n < 2) {
+            return $conjunction['singular'];
+        }
+        return $conjunction['plural'];
+    }
+
 }

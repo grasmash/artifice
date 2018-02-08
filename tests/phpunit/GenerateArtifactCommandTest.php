@@ -122,7 +122,7 @@ class GenerateArtifactCommandTest extends CommandTestBase
         $this->application->setIo(new BufferIO());
         $commit_msg = 'Test commit message.';
         $input = new ArrayInput(
-            ['--commit-msg' => $commit_msg],
+            ['--commit_msg' => $commit_msg],
             $this->command->getDefinition()
         );
         $this->command->setCommitMessage($input);
@@ -134,16 +134,24 @@ class GenerateArtifactCommandTest extends CommandTestBase
      */
     public function testAskCommitMessage()
     {
-        $args = [ '--dry-run' => true ];
+        $args = [
+            '--create_branch' => true,
+            '--create_tag' => false
+        ];
         $options = [ 'interactive' => true ];
         $commit_msg = 'Test commit message.';
         $this->commandTester->setInputs([
-            // Would you like to create a tag?
+            // Do you want to create a branch, tag, or both?
+            0,
+            // Would you like to push the resulting Branch to one of your remotes?
+            'no',
+            // Would you like to cleanup the generated artifact directory?
+            'no',
+            // By default, the generated Branch will also be saved to the source repository. Would you like to clean up these references?
             'yes',
-            // Enter a valid commit message:
+            // Enter a valid commit message
             $commit_msg,
         ]);
-        $this->command->setSimulate(true);
         $this->commandTester->execute($args, $options);
         $this->assertEquals($commit_msg, $this->command->getCommitMessage());
     }

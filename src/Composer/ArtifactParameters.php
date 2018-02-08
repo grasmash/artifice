@@ -14,10 +14,10 @@ class ArtifactParameters extends ParameterBag {
             'remote' => null,
             'cleanup' => [
                 'local' => false,
-                'deploy' => true,
+                'artifact' => true,
             ],
             'commit_message' => null,
-            'deploy_dir' => 'deploy',
+            'artifact_dir' => 'artifact',
             'refs_noun' => null,
         ];
 
