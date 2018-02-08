@@ -669,8 +669,7 @@ class GenerateArtifactCommand extends BaseCommand
                 $this->artifactParams->set('create_branch', $branchName);
                 break;
             case 'tag':
-                $tagName = 'artifact-' . $this->runCommand('git rev-parse --short HEAD');
-                $this->artifactParams->set('create_tag', $tagName);
+                $this->setTagName($input);
                 break;
             case 'branch and tag':
                 $branchName = 'artifact-' . $this->getCurrentBranch();
