@@ -58,8 +58,11 @@ class GenerateArtifactCommand extends BaseCommand
     protected function initialize(InputInterface $input, OutputInterface $output)
     {
         $this->progress = new ProgressBar($output);
-        $this->progress->setFormatDefinition('custom', " %current%/%max% |%bar%| \n %message% \n");
+        $this->progress->setFormatDefinition('custom', "\n %current%/%max% |%bar%| \n\n%message% \n\n");
         $this->progress->setFormat('custom');
+        $this->progress->setBarCharacter('■');
+        $this->progress->setProgressCharacter('▶');
+        $this->progress->setEmptyBarCharacter('▬');
         parent::initialize($input, $output);
     }
 
@@ -251,7 +254,11 @@ class GenerateArtifactCommand extends BaseCommand
             $refs['branch'] = "branch '<info>$branch</info>'";
         }
 
-        $summary = 'The ' . $this->oxford($refs) . ' ' . $this->getConjunction(count($refs)) . ' available ' . $this->oxford($locations) . '.';
+        $summary = 'The ' . $this->oxford($refs) . ' ' . $this->plural(count($refs)) . ' available ' . $this->oxford($locations) . '.';
+
+        if (!count($locations)) {
+            $summary = '<error>Successfully created ' . $this->oxford($refs) . ' but the provided options mean ' . $this->plural(count($refs), ['singular' => 'it wasn\'t', 'plural' => 'they weren\'t']) . ' saved or pushed anywehere.</error>';
+        }
 
         $this->progress->setMessage($summary);
     }
@@ -622,7 +629,7 @@ class GenerateArtifactCommand extends BaseCommand
             'Branch and Tag',
         ];
         $refs = $this->getIO()->select(
-            'Do you want to create a branch, tag, or both?',
+            'Do you want to create a branch, tag, or both? [<comment>[<info>1</info>] Tag</comment>]',
             $choices,
             'Tag'
         );
@@ -815,12 +822,12 @@ class GenerateArtifactCommand extends BaseCommand
     /**
      * Returns plural or singular word based on provided count.
      */
-    protected function getConjunction($n, $conjunction = ['singular' => 'is', 'plural' => 'are'])
+    protected function plural($n, $form = ['singular' => 'is', 'plural' => 'are'])
     {
         if ($n < 2) {
-            return $conjunction['singular'];
+            return $form['singular'];
         }
-        return $conjunction['plural'];
+        return $form['plural'];
     }
 
 }
