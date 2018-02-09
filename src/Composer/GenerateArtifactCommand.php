@@ -256,6 +256,62 @@ class GenerateArtifactCommand extends BaseCommand
         $this->progress->setMessage($summary);
     }
 
+    protected function determineOutputRefs(InputInterface $input)
+    {
+        if ($input->getOption('create_branch')) {
+            $branchName = 'artifact-' . $this->getCurrentBranch();
+            $this->artifactParams->set('create_branch', $branchName);
+            $this->artifactParams->set('refs_noun', 'Branch');
+        }
+        if ($input->getOption('create_tag')) {
+            $this->setTagName($input);
+            $this->artifactParams->set('refs_noun', 'Tag');
+        }
+        if (!$input->getOption('create_branch') && !$input->getOption('create_tag')) {
+            // If either branch or tag options are passed, we assume that we
+            // shouldn't ask about output refs. So we only ask if both are not.
+            $this->askOutputRefs($input);
+        } elseif ($input->getOption('create_branch') && $input->getOption('create_tag')) {
+            $this->artifactParams->set('refs_noun', 'Branch and Tag');
+        }
+    }
+
+    protected function determineRemotes(InputInterface $input)
+    {
+        if ($remote = $input->getOption('remote')) {
+            $this->validateRemote($remote);
+            $this->artifactParams->set('remote', $remote);
+            $this->say("Set to push artifacts to <comment>$remote</comment> remote.");
+        }
+        elseif ($this->askRemote()) {
+            if (count($this->getGitRemotes() > 1)) {
+                $remotes = $this->getGitRemotes();
+                $remote = $this->askWhichRemote($remotes);
+            }
+            else {
+                $remote = reset($this->getGitRemotes());
+            }
+            $this->artifactParams->set('remote', $remote);
+        }
+    }
+
+    protected function determineCleanup(InputInterface $input)
+    {
+        if ($input->getOption('cleanup_local')) {
+            $this->artifactParams->set('cleanup_local', true);
+        }
+        if ($input->getOption('save_artifact')) {
+            $this->artifactParams->set('save_artifact', true);
+        }
+
+        if (!$input->getOption('cleanup_local') && !$input->getOption('save_artifact')) {
+            // If either cleanup_local or save_artifact (or both) are passed,
+            // we assume that we shouldn't ask about cleanup. So we only ask if
+            // both are not.
+            $this->askCleanup();
+        }
+    }
+
     /**
      * Removes the generated artifact directory.
      */
@@ -492,172 +548,22 @@ class GenerateArtifactCommand extends BaseCommand
     public function setCommitMessage(InputInterface $input)
     {
         $commit_msg_option = $input->getOption('commit_msg');
+        $git_last_commit_message = $this->getLastCommitMessage();
         if ($commit_msg_option) {
             $this->say("Commit message is set to <comment>$commit_msg_option</comment>.");
             $this->artifactParams->set('commit_message', $commit_msg_option);
+        } elseif (!$this->artifactParams->get('create_branch') && !$this->artifactParams->get('save_artifact')) {
+            // No need to ask about the commit message if we're not saving the
+            // branch and deleting the artifact directory since it would never
+            // be seen.
+            $this->artifactParams->set('commit_message', $git_last_commit_message);
         } else {
-            $git_last_commit_message = $this->getLastCommitMessage();
             $this->artifactParams->set('commit_message',
                 $this->getIO()->ask(
                     "Enter a valid commit message [<comment>$git_last_commit_message</comment>]",
                     $git_last_commit_message
                 )
             );
-        }
-    }
-
-    /**
-     * Sets the name of the tag to be used when create a tag reference of the
-     * artifact. Defaults to the commit hash of the source repo commit.
-     *
-     * @param InputInterface $input
-     */
-    public function setTagName(InputInterface $input)
-    {
-        if ($tag_name_option = $input->getOption('create_tag')) {
-            $this->say("Tag name is set to <comment>$tag_name_option</comment>.");
-            $this->artifactParams->set('create_tag', $tag_name_option);
-        } else {
-            $tagName = 'artifact-' . $this->runCommand('git rev-parse --short HEAD');
-            $this->artifactParams->set(
-                'create_tag',
-                $this->askTagName($tagName)
-            );
-        }
-    }
-
-    public function getCommitMessage()
-    {
-        return $this->artifactParams->get('commit_message');
-    }
-    public function getTagName()
-    {
-        return $this->artifactParams->get('create_tag');
-    }
-    protected function say($message)
-    {
-        $this->getIO()->writeError($message);
-    }
-    protected function warn($message)
-    {
-        $this->getIO()->writeError("<warning>$message</warning>");
-    }
-
-    /**
-     * @return string
-     */
-    public function getLastCommitMessage()
-    {
-        $output = $this->runCommand(
-            'git log --oneline -1',
-            "Unable to find any git history!",
-            $this->getRepoRoot()
-        );
-        $log = explode(' ', $output, 2);
-        $git_last_commit_message = trim($log[1]);
-
-        return $git_last_commit_message;
-    }
-
-    /**
-     * Wrapper method around Symfony's ProcessExecutor.
-     *
-     * @param string $command
-     * @param string $error_msg
-     * @param string $cwd
-     *
-     * @return string
-     *   The output of the command if successful.
-     */
-    protected function runCommand($command, $error_msg = null, $cwd = null) {
-        $process = new ProcessExecutor($this->getIO());
-        $exit_code = $process->execute($command, $output, $cwd);
-        if ($exit_code !== 0) {
-            if (!$error_msg) {
-                $error_msg = "Command $command returned a non-zero exit status.";
-            }
-            throw new RuntimeException($error_msg);
-        }
-        return trim($output);
-    }
-
-    /**
-     * Returns the repo root's filepath, assumed to be one dir above vendor dir.
-     *
-     * @return string
-     *   The file path of the repository root.
-     */
-    public function getRepoRoot()
-    {
-        return dirname($this->getVendorPath());
-    }
-
-    /**
-     * Get the path to the 'vendor' directory.
-     *
-     * @return string
-     */
-    public function getVendorPath()
-    {
-        $config = $this->getComposer()->getConfig();
-        $this->fs->exists($config->get('vendor-dir'));
-        $vendorPath = $this->fs->makePathRelative(realpath($config->get('vendor-dir')), '.');
-
-        return $vendorPath;
-    }
-
-    protected function determineOutputRefs(InputInterface $input)
-    {
-        if ($input->getOption('create_branch')) {
-            $branchName = 'artifact-' . $this->getCurrentBranch();
-            $this->artifactParams->set('create_branch', $branchName);
-            $this->artifactParams->set('refs_noun', 'Branch');
-        }
-        if ($input->getOption('create_tag')) {
-            $this->setTagName($input);
-            $this->artifactParams->set('refs_noun', 'Tag');
-        }
-        if (!$input->getOption('create_branch') && !$input->getOption('create_tag')) {
-            // If either branch or tag options are passed, we assume that we
-            // shouldn't ask about output refs. So we only ask if both are not.
-            $this->askOutputRefs($input);
-        } elseif ($input->getOption('create_branch') && $input->getOption('create_tag')) {
-            $this->artifactParams->set('refs_noun', 'Branch and Tag');
-        }
-    }
-
-    protected function determineRemotes(InputInterface $input)
-    {
-        if ($input->getOption('remote')) {
-            $this->validateRemote($input->getOption('remote'));
-            $this->artifactParams->set('remote', $input->getOption('remote'));
-        }
-        elseif ($this->askRemote()) {
-            if (count($this->getGitRemotes() > 1)) {
-                $options = $this->getGitRemotes();
-                $remote = $this->askWhichRemote($options);
-            }
-            else {
-                $remote = reset($this->getGitRemotes());
-            }
-            $this->artifactParams->set('remote', $remote);
-        }
-    }
-
-    protected function determineCleanup(InputInterface $input)
-    {
-        if ($input->getOption('cleanup_local')) {
-            $this->artifactParams->set('cleanup_local', true);
-        }
-        if ($input->getOption('save_artifact')) {
-            $this->artifactParams->set('save_artifact', true);
-        }
-
-        if (!$input->getOption('cleanup_local') && !$input->getOption('save_artifact')) {
-            // If either cleanup_local or save_artifact (or both) are passed,
-            // we assume that we shouldn't ask about cleanup. So we only ask if
-            // both are not.
-            $this->askCleanup();
         }
     }
 
@@ -681,21 +587,6 @@ class GenerateArtifactCommand extends BaseCommand
         }
     }
 
-    /**
-     * Verifies that the provided remote name is actually configured as a remote
-     * in the main repo.
-     *
-     * @param string $remote
-     *   The name of the remote to validate.
-     */
-    protected function validateRemote($remote)
-    {
-        $remotes = $this->getGitRemotes();
-        if (!in_array($remote, $remotes)) {
-            throw new InvalidArgumentException("You asked to push references to $remote, but no configured remote has that name. You have the following configured remotes: " . implode(', ', $remotes));
-        }
-    }
-
     protected function askTagName($tagName)
     {
         return $this->getIO()->ask(
@@ -707,19 +598,19 @@ class GenerateArtifactCommand extends BaseCommand
     protected function askRemote()
     {
         return $this->getIO()->askConfirmation(
-            'Would you like to push the resulting ' . $this->artifactParams->get('refs_noun') . ' to one of your remotes? [<comment>no</comment>] ',
+            'Would you like to push the resulting ' . $this->artifactParams->get('refs_noun') . ' to a remote repo? [<comment>no</comment>] ',
             false
         );
     }
 
-    protected function askWhichRemote($options)
+    protected function askWhichRemote($remotes)
     {
         return $this
             ->getIO()
             ->select(
-                'Which remote would you like to push the references to? [<comment>' . reset($options) . '</comment>] ',
-                $options,
-                reset($options)
+                'Which remote would you like to push the references to? [<comment>' . reset($remotes) . '</comment>] ',
+                $remotes,
+                reset($remotes)
             );
     }
 
@@ -762,6 +653,124 @@ class GenerateArtifactCommand extends BaseCommand
                     )
             );
         }
+    }
+
+    /**
+     * Verifies that the provided remote name is actually configured as a remote
+     * in the local repo.
+     *
+     * @param string $remote
+     *   The name of the remote to validate.
+     */
+    protected function validateRemote($remote)
+    {
+        $remotes = $this->getGitRemotes();
+        if (!in_array($remote, $remotes)) {
+            throw new InvalidArgumentException("You asked to push references to $remote, but no configured remote has that name. You have the following configured remotes: " . implode(', ', $remotes));
+        }
+    }
+
+    /**
+     * Sets the name of the tag to be used when create a tag reference of the
+     * artifact. Defaults to the commit hash of the source repo commit.
+     *
+     * @param InputInterface $input
+     */
+    public function setTagName(InputInterface $input)
+    {
+        if ($tag_name_option = $input->getOption('create_tag')) {
+            $this->say("Tag name is set to <comment>$tag_name_option</comment>.");
+            $this->artifactParams->set('create_tag', $tag_name_option);
+        } else {
+            $tagName = 'artifact-' . $this->runCommand('git rev-parse --short HEAD');
+            $this->artifactParams->set(
+                'create_tag',
+                $this->askTagName($tagName)
+            );
+        }
+    }
+
+    /**
+     * Wrapper method around Symfony's ProcessExecutor.
+     *
+     * @param string $command
+     * @param string $error_msg
+     * @param string $cwd
+     *
+     * @return string
+     *   The output of the command if successful.
+     */
+    protected function runCommand($command, $error_msg = null, $cwd = null) {
+        $process = new ProcessExecutor($this->getIO());
+        $exit_code = $process->execute($command, $output, $cwd);
+        if ($exit_code !== 0) {
+            if (!$error_msg) {
+                $error_msg = "Command $command returned a non-zero exit status.";
+            }
+            throw new RuntimeException($error_msg);
+        }
+        return trim($output);
+    }
+
+    /**
+     * The last commit message from the local git repo on the current branch.
+     *
+     * @return string
+     */
+    public function getLastCommitMessage()
+    {
+        $output = $this->runCommand(
+            'git log --oneline -1',
+            "Unable to find any git history!",
+            $this->getRepoRoot()
+        );
+        $log = explode(' ', $output, 2);
+        $git_last_commit_message = trim($log[1]);
+
+        return $git_last_commit_message;
+    }
+
+    /**
+     * Returns the repo root's filepath, assumed to be one dir above vendor dir.
+     *
+     * @return string
+     *   The file path of the repository root.
+     */
+    public function getRepoRoot()
+    {
+        return dirname($this->getVendorPath());
+    }
+
+    /**
+     * Get the path to the 'vendor' directory.
+     *
+     * @return string
+     */
+    public function getVendorPath()
+    {
+        $config = $this->getComposer()->getConfig();
+        $this->fs->exists($config->get('vendor-dir'));
+        $vendorPath = $this->fs->makePathRelative(realpath($config->get('vendor-dir')), '.');
+
+        return $vendorPath;
+    }
+
+    public function getCommitMessage()
+    {
+        return $this->artifactParams->get('commit_message');
+    }
+    public function getTagName()
+    {
+        return $this->artifactParams->get('create_tag');
+    }
+
+    protected function say($message)
+    {
+        $this->getIO()->writeError($message);
+    }
+    protected function warn($message)
+    {
+        $this->getIO()->writeError("<warning>$message</warning>");
     }
 
     /**
