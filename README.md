@@ -40,11 +40,11 @@ created.
   Proceed with artifact generation even if the current branch has uncommitted
   changes.  
 
-`--cleanup_local` _no value_  
+* `--cleanup_local` _no value_  
   Remove the generated references (Branch, Tag, or Both) from the local repo
   during cleanup.  
 
-`--save_artifact` _no value_
+* `--save_artifact` _no value_
   Don't delete the generated artifact directory during cleanup.
 
 ## Contributing
