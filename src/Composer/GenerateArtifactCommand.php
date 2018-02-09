@@ -5,6 +5,7 @@ namespace Grasmash\Artifice\Composer;
 use Composer\Command\BaseCommand;
 use Composer\Util\ProcessExecutor;
 use Gitonomy\Git\Repository;
+use Psr\Log\InvalidArgumentException;
 use RuntimeException;
 use Symfony\Component\Console\Helper\ProgressBar;
 use Symfony\Component\Console\Input\InputInterface;
@@ -12,7 +13,6 @@ use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\DependencyInjection\ParameterBag\FrozenParameterBag;
 use Symfony\Component\Filesystem\Filesystem;
-use Psr\Log\InvalidArgumentException;
 
 class GenerateArtifactCommand extends BaseCommand
 {
@@ -39,7 +39,7 @@ class GenerateArtifactCommand extends BaseCommand
     protected $repo;
 
     /**
-     * A progress bar to present.
+     * A progress bar to help UX during long tasks.
      *
      * @var $progress \Symfony\Component\Console\Helper\ProgressBar
      */
@@ -57,12 +57,7 @@ class GenerateArtifactCommand extends BaseCommand
      */
     protected function initialize(InputInterface $input, OutputInterface $output)
     {
-        $this->progress = new ProgressBar($output);
-        $this->progress->setFormatDefinition('custom', "\n %current%/%max% |%bar%| \n\n%message% \n\n");
-        $this->progress->setFormat('custom');
-        $this->progress->setBarCharacter('■');
-        $this->progress->setProgressCharacter('▶');
-        $this->progress->setEmptyBarCharacter('▬');
+        $this->createProgressBar($output);
         parent::initialize($input, $output);
     }
 
@@ -809,6 +804,16 @@ class GenerateArtifactCommand extends BaseCommand
     protected function warn($message)
     {
         $this->getIO()->writeError("<warning>$message</warning>");
+    }
+
+    protected function createProgressBar(OutputInterface $output)
+    {
+        $this->progress = new ProgressBar($output);
+        $this->progress->setFormatDefinition('custom', "\n %current%/%max% |%bar%| \n\n%message% \n\n");
+        $this->progress->setFormat('custom');
+        $this->progress->setBarCharacter('■');
+        $this->progress->setProgressCharacter('▶');
+        $this->progress->setEmptyBarCharacter('▬');
     }
 
     /**
