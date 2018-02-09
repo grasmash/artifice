@@ -447,13 +447,17 @@ class GenerateArtifactCommand extends BaseCommand
         );
 
         $this->progress->advance();
+
+        $this->progress->setMessage('Building frontend assets.');
+        $this->makeFrontend();
+        $this->progress->advance();
     }
 
     /**
      * An array of configured git remotes.
      *
      * @return array
-     *   The name of the configured git remote.
+     *   The name(s) of the configured git remote.
      */
     protected function getGitRemotes()
     {
@@ -547,6 +551,14 @@ class GenerateArtifactCommand extends BaseCommand
     }
 
     /**
+     * Builds frontend assets.
+     */
+    protected function makeFrontend()
+    {
+        // @todo
+    }
+
+    /**
      * Sets the commit message to be used for committing deployment artifact.
      * Defaults to the last commit message on the source branch.
      *
@@ -574,6 +586,11 @@ class GenerateArtifactCommand extends BaseCommand
         }
     }
 
+    /**
+     * @param \Symfony\Component\Console\Input\InputInterface $input
+     * @param string $ref
+     *   The noun(s) representation of the references to create.
+     */
     protected function normalizeRefs(InputInterface $input, $ref)
     {
         switch (strtolower($ref)) {
@@ -594,6 +611,12 @@ class GenerateArtifactCommand extends BaseCommand
         }
     }
 
+    /**
+     * @param string $tagName
+     *   The default if the user doesn't enter a value.
+     *
+     * @return string
+     */
     protected function askTagName($tagName)
     {
         return $this->getIO()->ask(
@@ -610,7 +633,14 @@ class GenerateArtifactCommand extends BaseCommand
         );
     }
 
-    protected function askWhichRemote($remotes)
+    /**
+     * @param array $remotes
+     *   The options to present to the user.
+     *
+     * @return string
+     *   The selected remote.
+     */
+    protected function askWhichRemote(array $remotes)
     {
         return $this
             ->getIO()
@@ -634,7 +664,7 @@ class GenerateArtifactCommand extends BaseCommand
             'Tag'
         );
         $this->artifactParams->set('refs_noun', $refs);
-        return self::normalizeRefs($input, $this->artifactParams->get('refs_noun'));
+        return $this->normalizeRefs($input, $this->artifactParams->get('refs_noun'));
     }
 
     protected function askCleanup()
@@ -701,8 +731,15 @@ class GenerateArtifactCommand extends BaseCommand
      * Wrapper method around Symfony's ProcessExecutor.
      *
      * @param string $command
+     *   The command to run.
      * @param string $error_msg
+     *   A custom error to pass to the exception if the command returns a
+     *   non-zero status.
      * @param string $cwd
+     *   The directory in which to run the command.
+     *
+     * @throws \RuntimeException
+     *   If the command returns a non-zero exit status.
      *
      * @return string
      *   The output of the command if successful.
@@ -822,7 +859,7 @@ class GenerateArtifactCommand extends BaseCommand
     /**
      * Returns plural or singular word based on provided count.
      */
-    protected function plural($n, $form = ['singular' => 'is', 'plural' => 'are'])
+    protected function plural($n, array $form = ['singular' => 'is', 'plural' => 'are'])
     {
         if ($n < 2) {
             return $form['singular'];
