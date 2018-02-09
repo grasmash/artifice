@@ -90,12 +90,6 @@ class GenerateArtifactCommand extends BaseCommand
             'The name of the git remote to which the generated artifact references should be pushed. References will not be pushed if this is empty.'
         );
         $this->addOption(
-            'branch',
-            null,
-            InputOption::VALUE_REQUIRED,
-            "The name of the git branch for the artifact. The tag is cut from this branch."
-        );
-        $this->addOption(
             'commit_msg',
             null,
             InputOption::VALUE_REQUIRED,
