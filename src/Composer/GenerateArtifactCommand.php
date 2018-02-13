@@ -70,13 +70,13 @@ class GenerateArtifactCommand extends BaseCommand
         $this->setDescription("Generate an deployment-ready artifact for a Drupal application.");
         $this->setAliases(['ga']);
         $this->addOption(
-            'create_branch',
+            'create-branch',
             null,
             InputOption::VALUE_NONE,
             'Whether or not the resulting artifact should be saved as a Git branch.'
         );
         $this->addOption(
-            'create_tag',
+            'create-tag',
             null,
             InputOption::VALUE_REQUIRED,
             'Whether or not the resulting artifact should be saved as a Git tag.'
@@ -88,25 +88,25 @@ class GenerateArtifactCommand extends BaseCommand
             'The name of the git remote to which the generated artifact references should be pushed. References will not be pushed if this is empty.'
         );
         $this->addOption(
-            'commit_msg',
+            'commit-msg',
             null,
             InputOption::VALUE_REQUIRED,
             "The git commit message for the artifact commit."
         );
         $this->addOption(
-            'allow_dirty',
+            'allow-dirty',
             null,
             InputOption::VALUE_NONE,
             "Allow artifact to be generated despite uncommitted changes in local git repository."
         );
         $this->addOption(
-            'cleanup_local',
+            'cleanup-local',
             null,
             InputOption::VALUE_NONE,
             "Whether or not to remove the created references from the local repo when finished."
         );
         $this->addOption(
-            'save_artifact',
+            'save-artifact',
             null,
             InputOption::VALUE_NONE,
             "Whether or not to save the artifact sub-directory when finished."
@@ -254,7 +254,7 @@ class GenerateArtifactCommand extends BaseCommand
         $summary = 'The ' . $this->oxford($refs) . ' ' . $this->plural(count($refs)) . ' available ' . $this->oxford($locations) . '.';
 
         if (!count($locations)) {
-            $summary = '<error>Successfully created ' . $this->oxford($refs) . ' but the provided options mean ' . $this->plural(count($refs), ['singular' => 'it wasn\'t', 'plural' => 'they weren\'t']) . ' saved or pushed anywehere.</error>';
+            $summary = '<error>Successfully created ' . $this->oxford($refs) . ' but the provided options mean ' . $this->plural(count($refs), ['singular' => 'it wasn\'t', 'plural' => 'they weren\'t']) . ' saved or pushed anywhere.</error>';
         }
 
         $this->progress->setMessage($summary);
@@ -262,20 +262,20 @@ class GenerateArtifactCommand extends BaseCommand
 
     protected function determineOutputRefs(InputInterface $input)
     {
-        if ($input->getOption('create_branch')) {
+        if ($input->getOption('create-branch')) {
             $branchName = 'artifact-' . $this->getCurrentBranch();
             $this->artifactParams->set('create_branch', $branchName);
             $this->artifactParams->set('refs_noun', 'Branch');
         }
-        if ($input->getOption('create_tag')) {
+        if ($input->getOption('create-tag')) {
             $this->setTagName($input);
             $this->artifactParams->set('refs_noun', 'Tag');
         }
-        if (!$input->getOption('create_branch') && !$input->getOption('create_tag')) {
+        if (!$input->getOption('create-branch') && !$input->getOption('create-tag')) {
             // If either branch or tag options are passed, we assume that we
             // shouldn't ask about output refs. So we only ask if both are not.
             $this->askOutputRefs($input);
-        } elseif ($input->getOption('create_branch') && $input->getOption('create_tag')) {
+        } elseif ($input->getOption('create-branch') && $input->getOption('create-tag')) {
             $this->artifactParams->set('refs_noun', 'Branch and Tag');
         }
     }
@@ -301,15 +301,15 @@ class GenerateArtifactCommand extends BaseCommand
 
     protected function determineCleanup(InputInterface $input)
     {
-        if ($input->getOption('cleanup_local')) {
+        if ($input->getOption('cleanup-local')) {
             $this->artifactParams->set('cleanup_local', true);
         }
-        if ($input->getOption('save_artifact')) {
+        if ($input->getOption('save-artifact')) {
             $this->artifactParams->set('save_artifact', true);
         }
 
-        if (!$input->getOption('cleanup_local') && !$input->getOption('save_artifact')) {
-            // If either cleanup_local or save_artifact (or both) are passed,
+        if (!$input->getOption('cleanup-local') && !$input->getOption('save-artifact')) {
+            // If either cleanup-local or save-artifact (or both) are passed,
             // we assume that we shouldn't ask about cleanup. So we only ask if
             // both are not.
             $this->askCleanup();
@@ -427,7 +427,7 @@ class GenerateArtifactCommand extends BaseCommand
 
         // Use the local repo as the source for cloning because the current
         // branch isn't necessarily pushed to a remote.
-        $source = $this->runCommand('pwd');
+        $source = getcwd();
         $artifactDir = $instructions->get('artifact_dir');
         $branch = $this->getCurrentBranch();
 
@@ -539,20 +539,20 @@ class GenerateArtifactCommand extends BaseCommand
      */
     protected function checkDirty(InputInterface $input)
     {
-        $allow_dirty = $input->getOption('allow_dirty');
+        $allowDirty = $input->getOption('allow-dirty');
         $process = new ProcessExecutor($this->getIO());
         $exit_code = $process->execute("git status --porcelain", $output);
 
-        if (!$allow_dirty && $exit_code !== 0) {
+        if (!$allowDirty && $exit_code !== 0) {
             throw new RuntimeException("Unable to determine if local git repository is dirty.");
         }
 
         $dirty = (bool) $output;
         if ($dirty) {
-            if ($allow_dirty) {
+            if ($allowDirty) {
                 $this->warn("There are uncommitted changes in your local git repository. Continuing anyway...");
             } else {
-                throw new RuntimeException("There are uncommitted changes in your local git repository! Commit or stash these changes before generating artifact. Use --allow_dirty option to disable this check.");
+                throw new RuntimeException("There are uncommitted changes in your local git repository! Commit or stash these changes before generating artifact. Use --allow-dirty option to disable this check.");
             }
         }
     }
@@ -573,11 +573,11 @@ class GenerateArtifactCommand extends BaseCommand
      */
     public function setCommitMessage(InputInterface $input)
     {
-        $commit_msg_option = $input->getOption('commit_msg');
+        $commitMsgOption = $input->getOption('commit-msg');
         $git_last_commit_message = $this->getLastCommitMessage();
-        if ($commit_msg_option) {
-            $this->say("Commit message is set to <comment>$commit_msg_option</comment>.");
-            $this->artifactParams->set('commit_message', $commit_msg_option);
+        if ($commitMsgOption) {
+            $this->say("Commit message is set to <comment>$commitMsgOption</comment>.");
+            $this->artifactParams->set('commit_message', $commitMsgOption);
         } elseif (!$this->artifactParams->get('create_branch') && !$this->artifactParams->get('save_artifact')) {
             // No need to ask about the commit message if we're not saving the
             // branch and deleting the artifact directory since it would never
@@ -722,7 +722,7 @@ class GenerateArtifactCommand extends BaseCommand
      */
     public function setTagName(InputInterface $input)
     {
-        if ($tag_name_option = $input->getOption('create_tag')) {
+        if ($tag_name_option = $input->getOption('create-tag')) {
             $this->say("Tag name is set to <comment>$tag_name_option</comment>.");
             $this->artifactParams->set('create_tag', $tag_name_option);
         } else {
