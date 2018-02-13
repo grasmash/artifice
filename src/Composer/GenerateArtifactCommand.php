@@ -13,6 +13,7 @@ use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\DependencyInjection\ParameterBag\FrozenParameterBag;
 use Symfony\Component\Filesystem\Filesystem;
+use Symfony\Component\Finder\Finder;
 
 class GenerateArtifactCommand extends BaseCommand
 {
@@ -44,6 +45,8 @@ class GenerateArtifactCommand extends BaseCommand
      * @var $progress \Symfony\Component\Console\Helper\ProgressBar
      */
     protected $progress;
+
+    protected $simulate = false;
 
     public function __construct($name = NULL)
     {
@@ -126,6 +129,11 @@ class GenerateArtifactCommand extends BaseCommand
 
         $this->progress->start(9);
 
+        if ($this->simulate) {
+            $this->progress->finish();
+            return 0;
+        }
+
         $this->build($instructions);
         $this->deploy($instructions);
         $this->cleanup($instructions);
@@ -164,7 +172,7 @@ class GenerateArtifactCommand extends BaseCommand
     protected function build(FrozenParameterBag $instructions)
     {
         $this->createDirectory($instructions);
-        $this->intitalizeGit($instructions);
+        $this->intializeGit($instructions);
         $this->make($instructions);
         $this->createBranch($instructions);
 
@@ -280,7 +288,7 @@ class GenerateArtifactCommand extends BaseCommand
             $this->say("Set to push artifacts to <comment>$remote</comment> remote.");
         }
         elseif ($this->askRemote()) {
-            if (count($this->getGitRemotes() > 1)) {
+            if (count($this->getGitRemotes()) > 1) {
                 $remotes = $this->getGitRemotes();
                 $remote = $this->askWhichRemote($remotes);
             }
@@ -396,14 +404,24 @@ class GenerateArtifactCommand extends BaseCommand
      * @param $cleanDir
      *   The directory to clean relative to repo root.
      */
-    protected function cleanSubmodules($artifactDir = 'artifact', $cleanDir) {
-        $this->runCommand("find '$artifactDir/$cleanDir' -type d | grep '\.git' | xargs rm -rf");
+    public function cleanSubmodules($artifactDir = 'artifact', $cleanDir) {
+        if (!$this->fs->exists(implode(DIRECTORY_SEPARATOR,  [$artifactDir, $cleanDir]))) {
+            return;
+        }
+        $finder = new Finder();
+        $finder
+            ->directories()
+            ->in(implode(DIRECTORY_SEPARATOR, [$artifactDir, $cleanDir]))
+            ->ignoreDotFiles(false)
+            ->ignoreVCS(false)
+            ->name('.git');
+        $this->fs->remove($finder->getIterator());
     }
 
     /**
      * Initializes git and does a local checkout.
      */
-    protected function intitalizeGit(FrozenParameterBag $instructions)
+    protected function intializeGit(FrozenParameterBag $instructions)
     {
         $this->progress->setMessage('Initializing git.');
 
@@ -864,6 +882,14 @@ class GenerateArtifactCommand extends BaseCommand
             return $form['singular'];
         }
         return $form['plural'];
+    }
+
+    /**
+     * @param bool $simulate
+     */
+    public function setSimulate($simulate)
+    {
+        $this->simulate = $simulate;
     }
 
 }
